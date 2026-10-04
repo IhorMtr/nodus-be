@@ -11,14 +11,43 @@ datasource db {
 }
 
 model User {
-  id           String        @id @default(uuid()) @db.Uuid
-  firstName    String        @db.VarChar(100)
-  lastName     String        @db.VarChar(100)
-  email        String        @unique @db.VarChar(254)
-  passwordHash String        @db.VarChar(255)
-  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime      @updatedAt @db.Timestamptz(3)
-  authSessions AuthSession[]
+  id                   String            @id @default(uuid()) @db.Uuid
+  firstName            String            @db.VarChar(100)
+  lastName             String            @db.VarChar(100)
+  email                String            @unique @db.VarChar(254)
+  passwordHash         String            @db.VarChar(255)
+  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
+  authSessions         AuthSession[]
+  workspaceMemberships WorkspaceMember[]
+}
+
+enum WorkspaceRole {
+  Owner
+  Admin
+  Member
+}
+
+model Workspace {
+  id        String            @id @default(uuid()) @db.Uuid
+  name      String            @db.VarChar(100)
+  createdAt DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime          @updatedAt @db.Timestamptz(3)
+  members   WorkspaceMember[]
+}
+
+model WorkspaceMember {
+  workspaceId String        @db.Uuid
+  userId      String        @db.Uuid
+  role        WorkspaceRole @default(Member)
+  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime      @updatedAt @db.Timestamptz(3)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  // A partial unique index in add_workspaces enforces at most one Owner per workspace.
+
+  @@id([workspaceId, userId])
+  @@index([userId])
 }
 
 model AuthSession {

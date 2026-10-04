@@ -1,6 +1,7 @@
 import type { OpenAPIV3 } from 'openapi-types';
 
 import { authPaths, authSchemas } from '../modules/auth/auth.openapi.js';
+import { workspacePaths, workspaceSchemas } from '../modules/workspaces/workspace.openapi.js';
 
 export const openApiDocument: OpenAPIV3.Document = {
   openapi: '3.0.3',
@@ -9,8 +10,19 @@ export const openApiDocument: OpenAPIV3.Document = {
     version: '0.1.0',
     description: 'HTTP API for Nodus.',
   },
-  tags: [{ name: 'Auth', description: 'User authentication.' }],
+  tags: [
+    { name: 'Auth', description: 'User authentication.' },
+    { name: 'Workspaces', description: 'Workspaces, memberships, and basic role authorization.' },
+  ],
   components: {
+    securitySchemes: {
+      bearerAuth: {
+        type: 'http',
+        scheme: 'bearer',
+        bearerFormat: 'JWT',
+        description: 'Access token sent as Authorization: Bearer <accessToken>. Refresh tokens and cookies are not accepted.',
+      },
+    },
     schemas: {
       ApiErrorResponse: {
         type: 'object',
@@ -32,6 +44,7 @@ export const openApiDocument: OpenAPIV3.Document = {
         },
       },
       ...authSchemas,
+      ...workspaceSchemas,
     },
   },
   paths: {
@@ -68,6 +81,7 @@ export const openApiDocument: OpenAPIV3.Document = {
       },
     },
     ...authPaths,
+    ...workspacePaths,
   },
 };
 
