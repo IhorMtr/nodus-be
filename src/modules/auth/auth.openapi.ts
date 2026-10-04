@@ -59,7 +59,7 @@ const email: OpenAPIV3.SchemaObject = {
   type: 'string',
   format: 'email',
   maxLength: 254,
-  description: 'Trimmed and normalized to lowercase before use.',
+  description: 'Trimmed and converted to lowercase.',
   example: 'john@example.com',
 };
 
@@ -67,7 +67,7 @@ const name: OpenAPIV3.SchemaObject = {
   type: 'string',
   minLength: 1,
   maxLength: 100,
-  description: 'Leading and trailing whitespace is trimmed before validation.',
+  description: 'Leading and trailing whitespace is trimmed.',
 };
 
 export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
@@ -86,7 +86,7 @@ export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
         minLength: 8,
         maxLength: 128,
         pattern: '^(?=[\\s\\S]*[A-Z])(?=[\\s\\S]*[0-9])[\\s\\S]+$',
-        description: 'At least 8 characters, one uppercase ASCII letter, and one digit. Special characters are optional. Whitespace is preserved.',
+        description: 'At least 8 characters, with at least one uppercase ASCII letter and one digit.',
         example: 'Password1',
       },
       confirmPassword: {
@@ -95,7 +95,7 @@ export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
         writeOnly: true,
         minLength: 1,
         maxLength: 128,
-        description: 'Must equal password exactly. A mismatch produces a confirmPassword field error.',
+        description: 'Must match password exactly.',
         example: 'Password1',
       },
     },
@@ -112,7 +112,6 @@ export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
         writeOnly: true,
         minLength: 1,
         maxLength: 128,
-        description: 'The existing password; whitespace is preserved.',
         example: 'Password1',
       },
     },
@@ -127,7 +126,7 @@ export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
         minLength: 1,
         maxLength: 4096,
         writeOnly: true,
-        description: 'The refresh JWT returned by registration, login, or the latest successful refresh. Send it only in this JSON body.',
+        description: 'Refresh token returned by registration, login, or refresh.',
       },
     },
   },
@@ -138,16 +137,16 @@ export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
     properties: {
       accessToken: {
         type: 'string',
-        description: 'Access JWT valid for 15 minutes. Send only as Authorization: Bearer <accessToken> on protected routes.',
+        description: 'JWT access token.',
       },
       refreshToken: {
         type: 'string',
-        description: 'Refresh JWT valid for 7 days. Send only in the JSON body of /auth/refresh or /auth/logout. Replaced on every refresh.',
+        description: 'JWT refresh token. Expires after 7 days.',
       },
       expiresAt: {
         type: 'string',
         format: 'date-time',
-        description: 'ISO 8601 UTC timestamp matching the access JWT exp claim.',
+        description: 'Access token expiration time in UTC.',
         example: '2026-10-03T14:15:00.000Z',
       },
     },
@@ -158,22 +157,22 @@ export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
 // ==================== OPERATIONS ====================
 
 const badRequest = errorResponse(
-  'Invalid fields or malformed JSON. Field errors are grouped by field name; request-level errors use _form.',
+  'Invalid request body.',
   ['ValidationFailed', 'InvalidJson'],
 );
 const unexpectedError = errorResponse('Unexpected server error.', ['InternalError']);
-const rateLimit = errorResponse('Too many requests from this IP address.', ['TooManyRequests']);
+const rateLimit = errorResponse('Rate limit exceeded.', ['TooManyRequests']);
 
 export const authPaths: OpenAPIV3.PathsObject = {
   '/auth/register': {
     post: {
       tags: ['Auth'],
       operationId: 'register',
-      summary: 'Register and create an authenticated session',
-      description: 'Creates a user and session atomically, then returns access and refresh tokens in the JSON response body. No cookies are used. Limited to 10 requests per hour per IP address.',
+      summary: 'Register an account',
+      description: 'Creates an account and returns access and refresh tokens.',
       requestBody: requestBody('RegisterRequest'),
       responses: {
-        '201': successResponse('User and session created. Tokens are returned in the JSON response body.'),
+        '201': successResponse('Account and session created.'),
         '400': badRequest,
         '409': errorResponse('An account already uses this email address.', ['EmailAlreadyExists']),
         '429': rateLimit,
@@ -185,11 +184,11 @@ export const authPaths: OpenAPIV3.PathsObject = {
     post: {
       tags: ['Auth'],
       operationId: 'login',
-      summary: 'Sign in and create an authenticated session',
-      description: 'Returns access and refresh tokens in the JSON response body. No cookies are used. Unknown email and incorrect password produce the same error. Limited to 30 requests per 15 minutes per IP address.',
+      summary: 'Log in',
+      description: 'Creates a session and returns access and refresh tokens.',
       requestBody: requestBody('LoginRequest'),
       responses: {
-        '200': successResponse('Authenticated. Tokens are returned in the JSON response body.'),
+        '200': successResponse('Authentication succeeded.'),
         '400': badRequest,
         '401': errorResponse('Invalid email or password.', ['InvalidCredentials']),
         '429': rateLimit,
@@ -201,11 +200,11 @@ export const authPaths: OpenAPIV3.PathsObject = {
     post: {
       tags: ['Auth'],
       operationId: 'refresh',
-      summary: 'Rotate the refresh token and issue a new token pair',
-      description: 'Accepts refreshToken only in the JSON request body. Verifies the token and active session, then atomically replaces the stored token fingerprint. The previous refresh token becomes unusable. Only one concurrent request with the same token can succeed. Returns both new tokens in JSON; no cookies are used.',
+      summary: 'Refresh tokens',
+      description: 'Validates a refresh token and issues a new token pair.',
       requestBody: requestBody('RefreshTokenRequest'),
       responses: {
-        '200': successResponse('Refresh token rotated. Replace both tokens on the client.'),
+        '200': successResponse('Refresh token rotated.'),
         '400': badRequest,
         '401': errorResponse('Refresh token or session is invalid.', [
           'InvalidRefreshToken', 'RefreshTokenExpired', 'SessionRevoked', 'RefreshTokenReused',
@@ -218,11 +217,11 @@ export const authPaths: OpenAPIV3.PathsObject = {
     post: {
       tags: ['Auth'],
       operationId: 'logout',
-      summary: 'Revoke the session associated with a refresh token',
-      description: 'Accepts refreshToken only in the JSON request body and identifies the session using its cryptographic fingerprint. An expired current refresh token can revoke its session. Repeated logout and unknown or previously rotated tokens safely succeed without changing another session. Existing access tokens remain valid until their 15-minute expiration. No cookies are used.',
+      summary: 'Log out',
+      description: 'Revokes the session associated with the submitted current refresh token.',
       requestBody: requestBody('RefreshTokenRequest'),
       responses: {
-        '200': successResponse('Logout completed. The operation is idempotent.', 'LogoutResponse'),
+        '200': successResponse('Logout request completed.', 'LogoutResponse'),
         '400': badRequest,
         '500': unexpectedError,
       },

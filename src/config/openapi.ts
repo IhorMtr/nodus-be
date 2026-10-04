@@ -7,18 +7,10 @@ export const openApiDocument: OpenAPIV3.Document = {
   info: {
     title: 'Nodus API',
     version: '0.1.0',
-    description: 'HTTP API for Nodus. Authentication never uses cookies. Registration and login return tokens in JSON. Refresh and logout accept a refresh token only in the JSON body. Protected routes accept an access token only through Authorization: Bearer <accessToken>.',
+    description: 'HTTP API for Nodus.',
   },
-  tags: [{ name: 'Auth', description: 'Email/password authentication and session lifecycle.' }],
+  tags: [{ name: 'Auth', description: 'User authentication.' }],
   components: {
-    securitySchemes: {
-      BearerAuth: {
-        type: 'http',
-        scheme: 'bearer',
-        bearerFormat: 'JWT',
-        description: 'Access JWT only. Missing, malformed, incorrectly signed, or wrong-type tokens return HTTP 401 Unauthorized; expired access tokens return HTTP 401 AccessTokenExpired. Refresh tokens, cookies, query parameters, and request bodies cannot authenticate protected routes.',
-      },
-    },
     schemas: {
       ApiErrorResponse: {
         type: 'object',
@@ -29,13 +21,13 @@ export const openApiDocument: OpenAPIV3.Document = {
           data: { type: 'object', nullable: true, enum: [null] },
           messageType: {
             type: 'string',
-            description: 'Machine-readable PascalCase application error code.',
+            description: 'Machine-readable application error code.',
           },
           errors: {
             type: 'object',
             nullable: true,
             additionalProperties: { type: 'array', items: { type: 'string' } },
-            description: 'Field validation messages, or null for other errors. Request-level validation messages use _form.',
+            description: 'Field validation messages, or null when there are no field errors. Request-level messages use _form.',
           },
         },
       },
@@ -46,10 +38,10 @@ export const openApiDocument: OpenAPIV3.Document = {
     '/health': {
       get: {
         operationId: 'getHealth',
-        summary: 'Check whether the HTTP server is running',
+        summary: 'Check API availability',
         responses: {
           '200': {
-            description: 'The server is running.',
+            description: 'The API is available.',
             content: {
               'application/json': {
                 schema: {
@@ -78,3 +70,4 @@ export const openApiDocument: OpenAPIV3.Document = {
     ...authPaths,
   },
 };
+

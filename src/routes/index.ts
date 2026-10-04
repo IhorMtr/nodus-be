@@ -2,6 +2,7 @@ import { Router } from 'express';
 import swaggerUi from 'swagger-ui-express';
 
 import { openApiDocument } from '../config/openapi.js';
+import { env } from '../config/env.js';
 import { authRouter } from '../modules/auth/auth.routes.js';
 import { successResponse } from '../shared/utils/api-response.js';
 
@@ -13,11 +14,13 @@ router.get('/health', (_req, res) => {
 
 router.use('/auth', authRouter);
 
-router.use(
-  '/api/docs',
-  swaggerUi.serve,
-  swaggerUi.setup(openApiDocument, {
-    customSiteTitle: 'Nodus API documentation',
-    swaggerOptions: { validatorUrl: null },
-  }),
-);
+if (env.NODE_ENV === 'development') {
+  router.use(
+    '/api/docs',
+    swaggerUi.serve,
+    swaggerUi.setup(openApiDocument, {
+      customSiteTitle: 'Nodus API documentation',
+      swaggerOptions: { validatorUrl: null },
+    }),
+  );
+}
