@@ -4,6 +4,7 @@ import swaggerUi from 'swagger-ui-express';
 import { openApiDocument } from '../config/openapi.js';
 import { env } from '../config/env.js';
 import { authRouter } from '../modules/auth/auth.routes.js';
+import { channelRouter } from '../modules/channels/channel.routes.js';
 import { workspaceRouter } from '../modules/workspaces/workspace.routes.js';
 import { successResponse } from '../shared/utils/api-response.js';
 
@@ -14,6 +15,7 @@ router.get('/health', (_req, res) => {
 });
 
 router.use('/auth', authRouter);
+router.use('/workspaces/:workspaceId/channels', channelRouter);
 router.use('/workspaces', workspaceRouter);
 
 if (env.NODE_ENV === 'development') {
