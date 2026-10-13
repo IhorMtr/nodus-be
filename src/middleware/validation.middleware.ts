@@ -3,8 +3,8 @@ import type { ZodType } from 'zod';
 import { AppError } from '../shared/errors/app-error.js';
 import type { FieldErrors } from '../shared/types/api-response.js';
 
-function validateRequest(schema: ZodType, target: 'body' | 'params'): RequestHandler {
-  return (req, _res, next) => {
+function validateRequest(schema: ZodType, target: 'body' | 'params' | 'query'): RequestHandler {
+  return (req, res, next) => {
     const result = schema.safeParse(req[target]);
     if (!result.success) {
       const errors: FieldErrors = {};
@@ -20,8 +20,11 @@ function validateRequest(schema: ZodType, target: 'body' | 'params'): RequestHan
 
     if (target === 'body') {
       req.body = result.data;
-    } else {
+    } else if (target === 'params') {
       Object.assign(req.params, result.data);
+    } else {
+      // Express 5 exposes req.query as a getter; keep transformed values in locals.
+      res.locals.validatedQuery = result.data;
     }
     next();
   };
@@ -33,4 +36,8 @@ export function validateBody(schema: ZodType): RequestHandler {
 
 export function validateParams(schema: ZodType): RequestHandler {
   return validateRequest(schema, 'params');
+}
+
+export function validateQuery(schema: ZodType): RequestHandler {
+  return validateRequest(schema, 'query');
 }

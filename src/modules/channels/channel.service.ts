@@ -26,6 +26,12 @@ function toPublicChannel(channel: ChannelRecord): PublicChannel {
 
 // ==================== CHANNEL LIFECYCLE ====================
 
+export async function requireChannel(workspaceId: string, channelId: string) {
+  const channel = await channelRepository.findChannel(workspaceId, channelId);
+  if (!channel) throw channelErrors.notFound();
+  return channel;
+}
+
 async function createChannel(workspaceId: string, userId: string, input: CreateChannelInput): Promise<PublicChannel> {
   await requireWorkspaceRole(workspaceId, userId, ['Owner', 'Admin']);
   try {
@@ -46,8 +52,7 @@ async function listChannels(workspaceId: string, userId: string): Promise<Public
 
 async function getChannel(workspaceId: string, userId: string, channelId: string): Promise<PublicChannel> {
   await requireWorkspaceMember(workspaceId, userId);
-  const channel = await channelRepository.findChannel(workspaceId, channelId);
-  if (!channel) throw channelErrors.notFound();
+  const channel = await requireChannel(workspaceId, channelId);
   return toPublicChannel(channel);
 }
 

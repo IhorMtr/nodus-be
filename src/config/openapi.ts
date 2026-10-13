@@ -2,6 +2,7 @@ import type { OpenAPIV3 } from 'openapi-types';
 
 import { authPaths, authSchemas } from '../modules/auth/auth.openapi.js';
 import { channelPaths, channelSchemas } from '../modules/channels/channel.openapi.js';
+import { messagePaths, messageSchemas } from '../modules/messages/message.openapi.js';
 import { workspacePaths, workspaceSchemas } from '../modules/workspaces/workspace.openapi.js';
 
 export const openApiDocument: OpenAPIV3.Document = {
@@ -15,6 +16,7 @@ export const openApiDocument: OpenAPIV3.Document = {
     { name: 'Auth', description: 'User authentication.' },
     { name: 'Workspaces', description: 'Workspaces, memberships, and basic role authorization.' },
     { name: 'Channels', description: 'Workspace channels and workspace role authorization.' },
+    { name: 'Messages', description: 'Channel messages, cursor-based history, and author or moderator permissions.' },
   ],
   components: {
     securitySchemes: {
@@ -48,6 +50,7 @@ export const openApiDocument: OpenAPIV3.Document = {
       ...authSchemas,
       ...workspaceSchemas,
       ...channelSchemas,
+      ...messageSchemas,
     },
   },
   paths: {
@@ -86,6 +89,7 @@ export const openApiDocument: OpenAPIV3.Document = {
     ...authPaths,
     ...workspacePaths,
     ...channelPaths,
+    ...messagePaths,
   },
 };
 
