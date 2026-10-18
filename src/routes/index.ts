@@ -15,6 +15,10 @@ router.get('/health', (_req, res) => {
   res.json(successResponse({ status: 'ok' }));
 });
 
+router.get('/api/openapi.json', (_req, res) => {
+  res.json(openApiDocument);
+});
+
 router.use('/auth', authRouter);
 router.use('/workspaces/:workspaceId/channels/:channelId/messages', messageRouter);
 router.use('/workspaces/:workspaceId/channels', channelRouter);
