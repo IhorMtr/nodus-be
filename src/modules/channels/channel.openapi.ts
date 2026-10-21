@@ -170,7 +170,7 @@ export const channelPaths: OpenAPIV3.PathsObject = {
       ...protectedOperation,
       operationId: 'createChannel',
       summary: 'Create a workspace channel',
-      description: 'Available to Owner and Admin. The channel belongs to this workspace and is readable by every workspace member. The name is required; empty bodies and unknown fields are rejected. Channels are created explicitly; creating a workspace does not create a default channel.',
+      description: 'Available to Owner and Admin. The channel belongs to this workspace and is readable by every workspace member. The name is required; empty bodies and unknown fields are rejected. Creating a workspace automatically creates a regular channel named `general`; this endpoint creates additional channels.',
       requestBody: requestBody('CreateChannelRequest'),
       responses: {
         ...authenticatedResponses,

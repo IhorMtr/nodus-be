@@ -17,6 +17,9 @@ const memberSelect = {
   user: { select: { firstName: true, lastName: true, email: true } },
 } satisfies Prisma.WorkspaceMemberSelect;
 
+// ==================== CONSTANTS ====================
+
+const DEFAULT_CHANNEL_NAME = 'general';
 const maxTransactionAttempts = 3;
 
 // ==================== DATABASE ACCESS ====================
@@ -27,6 +30,7 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
       data: {
         name,
         members: { create: { userId, role: WorkspaceRole.Owner } },
+        channels: { create: { name: DEFAULT_CHANNEL_NAME } },
       },
       select: workspaceSelect,
     });

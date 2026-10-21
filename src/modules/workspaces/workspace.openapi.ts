@@ -202,7 +202,7 @@ export const workspacePaths: OpenAPIV3.PathsObject = {
       ...protectedOperation,
       operationId: 'createWorkspace',
       summary: 'Create a workspace',
-      description: 'Any authenticated user can create a workspace. The workspace and the creator\'s Owner membership are created atomically. Each workspace has one Owner.',
+      description: 'Any authenticated user can create a workspace. Creating a workspace also creates the authenticated user as Owner and creates the default `general` channel atomically. Each workspace has one Owner.',
       requestBody: requestBody('CreateWorkspaceRequest'),
       responses: {
         ...authenticatedResponses,
