@@ -4,6 +4,10 @@ import { Server } from 'socket.io';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { SOCKET_EVENTS } from './socket-events.js';
+import { authenticateSocket } from './socket.auth.js';
+import { registerChannelHandlers } from './socket.channels.js';
+import { bindSocketPublisher } from './socket.publisher.js';
+import { userRoom } from './socket.rooms.js';
 import type {
   ClientToServerEvents,
   InterServerEvents,
@@ -24,11 +28,19 @@ export function initializeSocket(httpServer: HttpServer): SocketServer {
     },
   });
 
+  bindSocketPublisher(io);
+  io.use(authenticateSocket);
+
   io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
-    logger.debug({ socketId: socket.id }, 'Socket connected');
+    const { userId } = socket.data;
+    logger.debug({ socketId: socket.id, userId }, 'Socket connected');
+
+    // The default in-memory adapter joins synchronously, before any client event is handled.
+    void socket.join(userRoom(userId));
+    registerChannelHandlers(socket);
 
     socket.on(SOCKET_EVENTS.DISCONNECT, (reason) => {
-      logger.debug({ socketId: socket.id, reason }, 'Socket disconnected');
+      logger.debug({ socketId: socket.id, userId, reason }, 'Socket disconnected');
     });
   });
 

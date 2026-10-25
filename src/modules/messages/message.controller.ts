@@ -3,6 +3,11 @@ import type { Query } from 'express-serve-static-core';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
+import {
+  publishMessageCreated,
+  publishMessageDeleted,
+  publishMessageUpdated,
+} from '../../socket/socket.publisher.js';
 import { messageService } from './message.service.js';
 import type {
   CreateMessageInput,
@@ -30,6 +35,7 @@ export const createMessage: RequestHandler<MessageChannelParams, ApiResponse<Pub
     req.params.channelId,
     req.body,
   );
+  publishMessageCreated(req.params.workspaceId, message);
   res.status(201).json(successResponse(message));
 };
 
@@ -57,6 +63,7 @@ export const updateMessage: RequestHandler<MessageParams, ApiResponse<PublicMess
     req.params.messageId,
     req.body,
   );
+  publishMessageUpdated(req.params.workspaceId, message);
   res.json(successResponse(message));
 };
 
@@ -67,5 +74,6 @@ export const deleteMessage: RequestHandler<MessageParams, ApiResponse<null>> = a
     req.params.channelId,
     req.params.messageId,
   );
+  publishMessageDeleted(req.params.workspaceId, req.params.channelId, req.params.messageId);
   res.json(successResponse(null));
 };
