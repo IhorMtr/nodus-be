@@ -1,5 +1,6 @@
 import type { Request, RequestHandler } from 'express';
 import type { Query } from 'express-serve-static-core';
+import { logger } from '../../config/logger.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
@@ -35,6 +36,11 @@ export const createMessage: RequestHandler<MessageChannelParams, ApiResponse<Pub
     req.params.channelId,
     req.body,
   );
+  logger.info({
+    workspaceId: req.params.workspaceId,
+    channelId: req.params.channelId,
+    messageId: message.id,
+  }, 'Message created, invoking realtime publisher');
   publishMessageCreated(req.params.workspaceId, message);
   res.status(201).json(successResponse(message));
 };

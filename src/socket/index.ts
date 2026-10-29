@@ -33,7 +33,7 @@ export function initializeSocket(httpServer: HttpServer): SocketServer {
 
   io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
     const { userId } = socket.data;
-    logger.debug({ socketId: socket.id, userId }, 'Socket connected');
+    logger.info({ socketId: socket.id, userId }, 'Socket connected');
 
     // The default in-memory adapter joins synchronously, before any client event is handled.
     void socket.join(userRoom(userId));

@@ -61,6 +61,16 @@ async function joinChannel(socket: AppSocket, { workspaceId, channelId }: Channe
     await socket.leave(room);
     throw error;
   }
+
+  logger.info({
+    socketId: socket.id,
+    userId,
+    workspaceId,
+    channelId,
+    room,
+    roomSize: socket.nsp.adapter.rooms.get(room)?.size ?? 0,
+    socketRooms: [...socket.rooms],
+  }, 'Socket joined channel room');
 }
 
 async function leaveChannel(socket: AppSocket, { workspaceId, channelId }: ChannelSubscription): Promise<void> {

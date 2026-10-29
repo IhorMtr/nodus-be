@@ -27,7 +27,15 @@ function publish(operation: string, send: (io: SocketServer) => void): void {
 
 export function publishMessageCreated(workspaceId: string, message: PublicMessage): void {
   publish('message:created', (io) => {
-    io.to(channelRoom(workspaceId, message.channelId)).emit(SOCKET_EVENTS.MESSAGE_CREATED, { workspaceId, message });
+    const room = channelRoom(workspaceId, message.channelId);
+    logger.info({
+      workspaceId,
+      channelId: message.channelId,
+      messageId: message.id,
+      room,
+      roomSize: io.sockets.adapter.rooms.get(room)?.size ?? 0,
+    }, 'Publishing message:created');
+    io.to(room).emit(SOCKET_EVENTS.MESSAGE_CREATED, { workspaceId, message });
   });
 }
 
