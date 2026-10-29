@@ -7,6 +7,7 @@ import { env } from "../config/env.js";
 import { authRouter } from "../modules/auth/auth.routes.js";
 import { channelRouter } from "../modules/channels/channel.routes.js";
 import { messageRouter } from "../modules/messages/message.routes.js";
+import { inviteRouter, workspaceInviteRouter } from "../modules/invites/invite.routes.js";
 import { userRouter } from "../modules/users/user.routes.js";
 import { workspaceRouter } from "../modules/workspaces/workspace.routes.js";
 import { successResponse } from "../shared/utils/api-response.js";
@@ -20,6 +21,8 @@ router.get("/health", (_req, res) => {
 
 router.use("/auth", authRouter);
 router.use("/users", userRouter);
+router.use("/invites", inviteRouter);
+router.use("/workspaces/:workspaceId/invites", workspaceInviteRouter);
 router.use(
   "/workspaces/:workspaceId/channels/:channelId/messages",
   messageRouter,

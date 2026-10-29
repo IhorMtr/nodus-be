@@ -3,6 +3,7 @@ import type { OpenAPIV3 } from 'openapi-types';
 import { authPaths, authSchemas } from '../modules/auth/auth.openapi.js';
 import { channelPaths, channelSchemas } from '../modules/channels/channel.openapi.js';
 import { messagePaths, messageSchemas } from '../modules/messages/message.openapi.js';
+import { invitePaths, inviteSchemas } from '../modules/invites/invite.openapi.js';
 import { userPaths, userSchemas } from '../modules/users/user.openapi.js';
 import { workspacePaths, workspaceSchemas } from '../modules/workspaces/workspace.openapi.js';
 
@@ -19,6 +20,7 @@ export const openApiDocument: OpenAPIV3.Document = {
     { name: 'Workspaces', description: 'Workspaces, memberships, and basic role authorization.' },
     { name: 'Channels', description: 'Workspace channels and workspace role authorization.' },
     { name: 'Messages', description: 'Channel messages, cursor-based history, and author or moderator permissions.' },
+    { name: 'Invites', description: 'Single use workspace invitation links.' },
   ],
   components: {
     securitySchemes: {
@@ -54,6 +56,7 @@ export const openApiDocument: OpenAPIV3.Document = {
       ...workspaceSchemas,
       ...channelSchemas,
       ...messageSchemas,
+      ...inviteSchemas,
     },
   },
   paths: {
@@ -94,6 +97,7 @@ export const openApiDocument: OpenAPIV3.Document = {
     ...workspacePaths,
     ...channelPaths,
     ...messagePaths,
+    ...invitePaths,
   },
 };
 

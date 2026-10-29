@@ -20,6 +20,7 @@ model User {
   updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
   authSessions         AuthSession[]
   workspaceMemberships WorkspaceMember[]
+  createdWorkspaceInvites WorkspaceInvite[]
   messages             Message[]
 }
 
@@ -35,6 +36,7 @@ model Workspace {
   createdAt DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt DateTime          @updatedAt @db.Timestamptz(3)
   members   WorkspaceMember[]
+  invites   WorkspaceInvite[]
   channels  Channel[]
 }
 
@@ -76,6 +78,21 @@ model WorkspaceMember {
 
   @@id([workspaceId, userId])
   @@index([userId])
+}
+
+model WorkspaceInvite {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  createdById String    @db.Uuid
+  tokenHash   String    @unique @db.Char(64)
+  expiresAt   DateTime  @db.Timestamptz(3)
+  usedAt      DateTime? @db.Timestamptz(3)
+  revokedAt   DateTime? @db.Timestamptz(3)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User      @relation(fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model AuthSession {
