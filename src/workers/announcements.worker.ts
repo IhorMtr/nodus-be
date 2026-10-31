@@ -1,106 +1,61 @@
-import { Worker } from 'bullmq';
-import { Redis } from 'ioredis';
-import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { prisma } from '../database/client.js';
-import { announcementRepository } from '../modules/announcements/announcement.repository.js';
-import { publishAnnouncementJob } from '../modules/announcements/announcement.publisher.js';
-import {
-  announcementQueue,
-  enqueueAnnouncement,
-  type PublishAnnouncementJob,
-} from '../queues/announcement.queue.js';
-import { QUEUE_NAMES } from '../queues/queue-names.js';
+import { announcementQueue } from '../queues/announcement.queue.js';
 import { closeRedis } from '../redis/client.js';
+import { announcementWorker } from './announcements.lifecycle.js';
 
-// ==================== CONNECTIONS AND PROCESSING ====================
+// ==================== SHUTDOWN ====================
 
-const connection = new Redis(env.REDIS_URL, { maxRetriesPerRequest: null });
-connection.on('error', error =>
-  logger.error({ err: error }, 'Announcement worker Redis error')
-);
+let shuttingDown = false;
 
-const worker = new Worker<PublishAnnouncementJob>(
-  QUEUE_NAMES.announcements,
-  async job => {
-    if (job.name !== 'publish')
-      throw new Error(`Unknown announcement job: ${job.name}`);
-    await publishAnnouncementJob(job.data);
-  },
-  { connection }
-);
+async function shutdown(reason: string, exitCode = 0): Promise<void> {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  logger.info({ reason }, 'Shutting down announcement worker');
 
-worker.on('failed', (job, error) =>
-  logger.error(
-    { err: error, jobId: job?.id },
-    'Announcement publication job failed'
-  )
-);
-worker.on('error', error =>
-  logger.error({ err: error }, 'Announcement worker error')
-);
-
-// ==================== RECONCILIATION ====================
-
-async function reconcile() {
-  for (const announcement of await announcementRepository.pending()) {
-    if (announcement.publishAt)
-      await enqueueAnnouncement(
-        announcement.id,
-        announcement.scheduleVersion,
-        announcement.publishAt
-      );
-  }
-}
-
-// ==================== LIFECYCLE ====================
-
-let stopping = false;
-let reconciling = false;
-let timer: NodeJS.Timeout | undefined;
-
-async function runReconciliation() {
-  if (stopping || reconciling) return;
-  reconciling = true;
   try {
-    await reconcile();
+    await announcementWorker.close();
   } catch (error) {
-    logger.error({ err: error }, 'Announcement queue reconciliation failed');
-  } finally {
-    reconciling = false;
+    logger.error({ err: error }, 'Failed to close announcement worker');
+    exitCode = 1;
   }
+
+  try {
+    await announcementQueue.close();
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to close announcement queue');
+    exitCode = 1;
+  }
+
+  const infrastructure = await Promise.allSettled([
+    prisma.$disconnect(),
+    closeRedis(),
+  ]);
+  for (const result of infrastructure) {
+    if (result.status === 'rejected') {
+      logger.error({ err: result.reason }, 'Failed to close infrastructure');
+      exitCode = 1;
+    }
+  }
+  process.exitCode = exitCode;
 }
 
-async function shutdown() {
-  if (stopping) return;
-  stopping = true;
-  if (timer) clearInterval(timer);
-  await worker.close();
-  await announcementQueue.close();
-  await connection.quit();
-  await closeRedis();
-  await prisma.$disconnect();
-}
+// ==================== BOOTSTRAP ====================
 
 process.once('SIGINT', () => {
-  void shutdown();
+  void shutdown('SIGINT');
 });
 process.once('SIGTERM', () => {
-  void shutdown();
+  void shutdown('SIGTERM');
 });
 
-async function start() {
-  await prisma.$connect();
-  await runReconciliation();
-  timer = setInterval(() => {
-    void runReconciliation();
-  }, 30_000);
-  logger.info('Announcement worker started');
+async function bootstrap(): Promise<void> {
+  await Promise.all([prisma.$connect(), announcementQueue.waitUntilReady()]);
+  if (shuttingDown) return;
+  await announcementWorker.start();
 }
 
-void start().catch((error: unknown) => {
+void bootstrap().catch((error: unknown) => {
   logger.fatal({ err: error }, 'Announcement worker startup failed');
-  void shutdown().finally(() => {
-    process.exitCode = 1;
-  });
+  void shutdown('Startup failure', 1);
 });

@@ -6,7 +6,7 @@ import { logger } from '../config/logger.js';
 import { SOCKET_EVENTS } from './socket-events.js';
 import { authenticateSocket } from './socket.auth.js';
 import { registerChannelHandlers } from './socket.channels.js';
-import { bindSocketPublisher } from './socket.publisher.js';
+import { socketPublisher } from './socket.publisher.js';
 import { userRoom } from './socket.rooms.js';
 import type {
   ClientToServerEvents,
@@ -28,7 +28,7 @@ export function initializeSocket(httpServer: HttpServer): SocketServer {
     },
   });
 
-  bindSocketPublisher(io);
+  socketPublisher.bind(io);
   io.use(authenticateSocket);
 
   io.on(SOCKET_EVENTS.CONNECTION, socket => {

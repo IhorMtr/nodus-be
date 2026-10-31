@@ -3,7 +3,7 @@ import type { ParamsDictionary } from 'express-serve-static-core';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
-import { revokeWorkspaceAccess } from '../../socket/socket.publisher.js';
+import { socketPublisher } from '../../socket/socket.publisher.js';
 import { workspaceService } from './workspace.service.js';
 import type {
   CreateWorkspaceInput,
@@ -119,6 +119,9 @@ export const removeMember: RequestHandler<
     req.params.userId
   );
   // The membership is already deleted; this only stops live delivery to the removed user.
-  await revokeWorkspaceAccess(req.params.workspaceId, req.params.userId);
+  await socketPublisher.revokeWorkspaceAccess(
+    req.params.workspaceId,
+    req.params.userId
+  );
   res.json(successResponse(null));
 };

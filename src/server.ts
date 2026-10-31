@@ -3,8 +3,10 @@ import { app } from './app.js';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { prisma } from './database/client.js';
+import { announcementQueue } from './queues/announcement.queue.js';
 import { closeRedis, redis } from './redis/client.js';
 import { initializeSocket } from './socket/index.js';
+import { announcementWorker } from './workers/announcements.lifecycle.js';
 
 // ==================== SERVER ====================
 
@@ -34,11 +36,26 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
     exitCode = 1;
   }
 
-  const results = await Promise.allSettled([
+  // Stop job processing before closing the queue and shared infrastructure.
+  try {
+    await announcementWorker.close();
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to close announcement worker');
+    exitCode = 1;
+  }
+
+  try {
+    await announcementQueue.close();
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to close announcement queue');
+    exitCode = 1;
+  }
+
+  const infrastructure = await Promise.allSettled([
     prisma.$disconnect(),
     closeRedis(),
   ]);
-  for (const result of results) {
+  for (const result of infrastructure) {
     if (result.status === 'rejected') {
       logger.error(
         { err: result.reason },
@@ -68,7 +85,7 @@ httpServer.on('error', error => {
 });
 
 async function bootstrap(): Promise<void> {
-  await Promise.all([prisma.$connect(), redis.connect()]);
+  await Promise.all([prisma.$connect(), announcementQueue.waitUntilReady()]);
   if (shuttingDown) return;
 
   httpServer.listen(env.PORT, () => {
@@ -76,6 +93,11 @@ async function bootstrap(): Promise<void> {
       { port: env.PORT, environment: env.NODE_ENV },
       'Nodus backend started'
     );
+    void announcementWorker.start().catch((error: unknown) => {
+      logger.error({ err: error }, 'Failed to start announcement worker');
+      if (!shuttingDown)
+        void shutdown('Announcement worker startup failure', 1);
+    });
   });
 }
 
