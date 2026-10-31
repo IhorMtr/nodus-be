@@ -2,7 +2,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app } from '../../src/app.js';
 import { prisma } from '../../src/database/client.js';
-import { createUser, loginUser, authorization, testEmailPrefix } from './helpers.js';
+import {
+  createUser,
+  loginUser,
+  authorization,
+  testEmailPrefix,
+} from './helpers.js';
 
 interface ApiBody<T> {
   data: T;
@@ -19,10 +24,12 @@ interface WorkspaceResponse {
 
 beforeAll(async () => {
   const databaseName = process.env.DATABASE_URL
-    ? new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0] ?? ''
+    ? (new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0] ?? '')
     : '';
   if (!databaseName.endsWith('_test')) {
-    throw new Error('Integration tests require a DATABASE_URL whose database name ends in _test');
+    throw new Error(
+      'Integration tests require a DATABASE_URL whose database name ends in _test'
+    );
   }
   await prisma.$connect();
 });
@@ -39,9 +46,11 @@ afterEach(async () => {
     where: { userId: { in: userIds } },
     select: { workspaceId: true },
   });
-  const workspaceIds = [...new Set(memberships.map(({ workspaceId }) => workspaceId))];
+  const workspaceIds = [
+    ...new Set(memberships.map(({ workspaceId }) => workspaceId)),
+  ];
 
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async tx => {
     await tx.workspace.deleteMany({ where: { id: { in: workspaceIds } } });
     await tx.user.deleteMany({ where: { id: { in: userIds } } });
   });
@@ -60,12 +69,19 @@ describe('authentication API', () => {
 
     // Act
     const response = await request(app).post('/auth/register').send({
-      firstName: 'Ada', lastName: 'Lovelace', email, password: 'TestPassword123', confirmPassword: 'TestPassword123',
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      email,
+      password: 'TestPassword123',
+      confirmPassword: 'TestPassword123',
     });
 
     // Assert
     expect(response.status).toBe(201);
-    const body = response.body as unknown as ApiBody<{ accessToken: string; refreshToken: string }>;
+    const body = response.body as unknown as ApiBody<{
+      accessToken: string;
+      refreshToken: string;
+    }>;
     expect(body.data.accessToken).toEqual(expect.any(String));
     expect(body.data.refreshToken).toEqual(expect.any(String));
   });
@@ -86,7 +102,9 @@ describe('authentication API', () => {
     const user = await createUser();
 
     // Act
-    const response = await request(app).post('/auth/login').send({ email: user.email, password: 'WrongPassword1' });
+    const response = await request(app)
+      .post('/auth/login')
+      .send({ email: user.email, password: 'WrongPassword1' });
 
     // Assert
     expect(response.status).toBe(401);
@@ -137,9 +155,16 @@ describe('protected workspace API', () => {
       .set(authorization(owner.accessToken))
       .send({ name: 'Owner workspace' });
     const createdBody = created.body as unknown as ApiBody<WorkspaceResponse>;
-    const memberRecord = await prisma.user.findUniqueOrThrow({ where: { email: member.email }, select: { id: true } });
+    const memberRecord = await prisma.user.findUniqueOrThrow({
+      where: { email: member.email },
+      select: { id: true },
+    });
     await prisma.workspaceMember.create({
-      data: { workspaceId: createdBody.data.id, userId: memberRecord.id, role: 'Member' },
+      data: {
+        workspaceId: createdBody.data.id,
+        userId: memberRecord.id,
+        role: 'Member',
+      },
     });
 
     // Act

@@ -46,7 +46,10 @@ function updateChannel(workspaceId: string, channelId: string, name: string) {
   });
 }
 
-async function deleteChannel(workspaceId: string, channelId: string): Promise<void> {
+async function deleteChannel(
+  workspaceId: string,
+  channelId: string
+): Promise<void> {
   await prisma.channel.delete({
     where: { id: channelId, workspaceId },
     select: { id: true },
@@ -56,31 +59,48 @@ async function deleteChannel(workspaceId: string, channelId: string): Promise<vo
 // ==================== DATABASE ERRORS ====================
 
 export function isChannelNameConflictError(error: unknown): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== 'P2002'
+  ) {
     return false;
   }
   const target: unknown = error.meta?.['target'];
-  if (target === channelNameIndex || (Array.isArray(target) && target.includes(channelNameIndex))) {
+  if (
+    target === channelNameIndex ||
+    (Array.isArray(target) && target.includes(channelNameIndex))
+  ) {
     return true;
   }
 
   // The PostgreSQL adapter reports expression index violations by index name.
-  const adapterError = z.object({
-    cause: z.object({
-      kind: z.literal('UniqueConstraintViolation'),
-      constraint: z.object({ index: z.string() }),
-    }),
-  }).safeParse(error.meta?.['driverAdapterError']);
+  const adapterError = z
+    .object({
+      cause: z.object({
+        kind: z.literal('UniqueConstraintViolation'),
+        constraint: z.object({ index: z.string() }),
+      }),
+    })
+    .safeParse(error.meta?.['driverAdapterError']);
 
-  return adapterError.success && adapterError.data.cause.constraint.index === channelNameIndex;
+  return (
+    adapterError.success &&
+    adapterError.data.cause.constraint.index === channelNameIndex
+  );
 }
 
 export function isChannelNotFoundError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2025'
+  );
 }
 
 export function isChannelWorkspaceMissingError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2003'
+  );
 }
 
 // ==================== PUBLIC API ====================

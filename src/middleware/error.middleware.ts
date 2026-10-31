@@ -7,7 +7,7 @@ export const errorMiddleware: ErrorRequestHandler = (
   error: unknown,
   req,
   res,
-  next,
+  next
 ) => {
   if (res.headersSent) {
     next(error);
@@ -19,7 +19,9 @@ export const errorMiddleware: ErrorRequestHandler = (
       req.log.error({ err: error }, 'Request failed');
     }
 
-    res.status(error.statusCode).json(errorResponse(error.code, error.fieldErrors));
+    res
+      .status(error.statusCode)
+      .json(errorResponse(error.code, error.fieldErrors));
     return;
   }
 
@@ -38,7 +40,11 @@ export const errorMiddleware: ErrorRequestHandler = (
       return;
     }
 
-    if ((error.type === 'encoding.unsupported' || error.type === 'charset.unsupported') && error.status === 415) {
+    if (
+      (error.type === 'encoding.unsupported' ||
+        error.type === 'charset.unsupported') &&
+      error.status === 415
+    ) {
       res.status(415).json(errorResponse('UnsupportedMediaType'));
       return;
     }

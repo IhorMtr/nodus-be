@@ -8,15 +8,25 @@ const schemaRef = (name: string): OpenAPIV3.ReferenceObject => ({
 
 const errorResponse = (
   description: string,
-  codes: readonly string[],
+  codes: readonly string[]
 ): OpenAPIV3.ResponseObject => ({
   description,
   content: {
     'application/json': {
       schema: schemaRef('ApiErrorResponse'),
-      examples: Object.fromEntries(codes.map((code) => [code, {
-        value: { success: false, data: null, messageType: code, errors: null },
-      }])),
+      examples: Object.fromEntries(
+        codes.map(code => [
+          code,
+          {
+            value: {
+              success: false,
+              data: null,
+              messageType: code,
+              errors: null,
+            },
+          },
+        ])
+      ),
     },
   },
 });
@@ -32,7 +42,12 @@ export const userSchemas: Record<string, OpenAPIV3.SchemaObject> = {
       id: { type: 'string', format: 'uuid' },
       firstName: { type: 'string', maxLength: 100, example: 'John' },
       lastName: { type: 'string', maxLength: 100, example: 'Doe' },
-      email: { type: 'string', format: 'email', maxLength: 254, example: 'john@example.com' },
+      email: {
+        type: 'string',
+        format: 'email',
+        maxLength: 254,
+        example: 'john@example.com',
+      },
     },
   },
   CurrentUserResponse: {
@@ -56,17 +71,24 @@ export const userPaths: OpenAPIV3.PathsObject = {
       tags: ['Users'],
       operationId: 'getCurrentUser',
       summary: 'Get the current user',
-      description: 'Returns the authenticated user from the database with only id, firstName, lastName, and email. Requires Authorization: Bearer <accessToken>. The user ID comes from the access token; the client does not supply it. Refresh tokens and cookies are not accepted.',
+      description:
+        'Returns the authenticated user from the database with only id, firstName, lastName, and email. Requires Authorization: Bearer <accessToken>. The user ID comes from the access token; the client does not supply it. Refresh tokens and cookies are not accepted.',
       security: [{ bearerAuth: [] }],
       responses: {
         '200': {
           description: 'Public details of the authenticated user.',
-          content: { 'application/json': { schema: schemaRef('CurrentUserResponse') } },
+          content: {
+            'application/json': { schema: schemaRef('CurrentUserResponse') },
+          },
         },
-        '401': errorResponse('Missing, invalid, or expired Bearer access token. Refresh tokens cannot authorize this endpoint.', [
-          'Unauthorized', 'AccessTokenExpired',
-        ]),
-        '404': errorResponse('The user identified by the access token no longer exists.', ['UserNotFound']),
+        '401': errorResponse(
+          'Missing, invalid, or expired Bearer access token. Refresh tokens cannot authorize this endpoint.',
+          ['Unauthorized', 'AccessTokenExpired']
+        ),
+        '404': errorResponse(
+          'The user identified by the access token no longer exists.',
+          ['UserNotFound']
+        ),
         '500': errorResponse('Unexpected server error.', ['InternalError']),
       },
     },

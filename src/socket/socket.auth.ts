@@ -5,7 +5,10 @@ import { AppError } from '../shared/errors/app-error.js';
 import type { AppSocket } from './socket.types.js';
 
 // Clients send the access token in the handshake `auth` payload, never in the URL.
-export function authenticateSocket(socket: AppSocket, next: (error?: ExtendedError) => void): void {
+export function authenticateSocket(
+  socket: AppSocket,
+  next: (error?: ExtendedError) => void
+): void {
   const token: unknown = socket.handshake.auth.token;
   if (typeof token !== 'string' || token.length === 0) {
     next(new Error('Unauthorized'));

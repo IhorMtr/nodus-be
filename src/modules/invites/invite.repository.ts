@@ -1,21 +1,37 @@
 import { prisma } from '../../database/client.js';
 import { Prisma } from '../../generated/prisma/client.js';
 
+// ==================== SELECTS ====================
+
 const inviteSelect = {
-  id: true, workspaceId: true, createdById: true, expiresAt: true,
-  usedAt: true, revokedAt: true, createdAt: true,
+  id: true,
+  workspaceId: true,
+  createdById: true,
+  expiresAt: true,
+  usedAt: true,
+  revokedAt: true,
+  createdAt: true,
 } satisfies Prisma.WorkspaceInviteSelect;
 
+// ==================== DATABASE ACCESS ====================
+
 function createInviteRepository(client: Prisma.TransactionClient) {
-  function create(workspaceId: string, createdById: string, tokenHash: string, expiresAt: Date) {
+  function create(
+    workspaceId: string,
+    createdById: string,
+    tokenHash: string,
+    expiresAt: Date
+  ) {
     return client.workspaceInvite.create({
-      data: { workspaceId, createdById, tokenHash, expiresAt }, select: inviteSelect,
+      data: { workspaceId, createdById, tokenHash, expiresAt },
+      select: inviteSelect,
     });
   }
 
   function list(workspaceId: string) {
     return client.workspaceInvite.findMany({
-      where: { workspaceId }, select: inviteSelect,
+      where: { workspaceId },
+      select: inviteSelect,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
     });
   }
@@ -23,12 +39,18 @@ function createInviteRepository(client: Prisma.TransactionClient) {
   function findByHash(tokenHash: string) {
     return client.workspaceInvite.findUnique({
       where: { tokenHash },
-      select: { ...inviteSelect, workspace: { select: { id: true, name: true } } },
+      select: {
+        ...inviteSelect,
+        workspace: { select: { id: true, name: true } },
+      },
     });
   }
 
   function findById(workspaceId: string, id: string) {
-    return client.workspaceInvite.findFirst({ where: { workspaceId, id }, select: inviteSelect });
+    return client.workspaceInvite.findFirst({
+      where: { workspaceId, id },
+      select: inviteSelect,
+    });
   }
 
   async function claim(id: string, now: Date) {
@@ -48,25 +70,45 @@ function createInviteRepository(client: Prisma.TransactionClient) {
   }
 
   function findMembership(workspaceId: string, userId: string) {
-    return client.workspaceMember.findUnique({ where: { workspaceId_userId: { workspaceId, userId } }, select: { userId: true } });
+    return client.workspaceMember.findUnique({
+      where: { workspaceId_userId: { workspaceId, userId } },
+      select: { userId: true },
+    });
   }
 
   function addMember(workspaceId: string, userId: string) {
     return client.workspaceMember.create({
-      data: { workspaceId, userId, role: 'Member' }, select: { workspaceId: true, role: true },
+      data: { workspaceId, userId, role: 'Member' },
+      select: { workspaceId: true, role: true },
     });
   }
 
-  return { create, list, findByHash, findById, claim, revoke, findMembership, addMember };
+  return {
+    create,
+    list,
+    findByHash,
+    findById,
+    claim,
+    revoke,
+    findMembership,
+    addMember,
+  };
 }
+
+// ==================== PUBLIC API ====================
 
 export type InviteRepository = ReturnType<typeof createInviteRepository>;
 export const inviteRepository = createInviteRepository(prisma);
 
-export function withInviteTransaction<T>(callback: (repository: InviteRepository) => Promise<T>): Promise<T> {
-  return prisma.$transaction((tx) => callback(createInviteRepository(tx)));
+export function withInviteTransaction<T>(
+  callback: (repository: InviteRepository) => Promise<T>
+): Promise<T> {
+  return prisma.$transaction(tx => callback(createInviteRepository(tx)));
 }
 
 export function isUniqueMembershipError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002';
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2002'
+  );
 }

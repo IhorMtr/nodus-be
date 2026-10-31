@@ -11,17 +11,18 @@ datasource db {
 }
 
 model User {
-  id                   String            @id @default(uuid()) @db.Uuid
-  firstName            String            @db.VarChar(100)
-  lastName             String            @db.VarChar(100)
-  email                String            @unique @db.VarChar(254)
-  passwordHash         String            @db.VarChar(255)
-  createdAt            DateTime          @default(now()) @db.Timestamptz(3)
-  updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
-  authSessions         AuthSession[]
-  workspaceMemberships WorkspaceMember[]
+  id                      String            @id @default(uuid()) @db.Uuid
+  firstName               String            @db.VarChar(100)
+  lastName                String            @db.VarChar(100)
+  email                   String            @unique @db.VarChar(254)
+  passwordHash            String            @db.VarChar(255)
+  createdAt               DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime          @updatedAt @db.Timestamptz(3)
+  authSessions            AuthSession[]
+  workspaceMemberships    WorkspaceMember[]
   createdWorkspaceInvites WorkspaceInvite[]
-  messages             Message[]
+  messages                Message[]
+  announcements           Announcement[]
 }
 
 enum WorkspaceRole {
@@ -31,13 +32,33 @@ enum WorkspaceRole {
 }
 
 model Workspace {
-  id        String            @id @default(uuid()) @db.Uuid
-  name      String            @db.VarChar(100)
-  createdAt DateTime          @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime          @updatedAt @db.Timestamptz(3)
-  members   WorkspaceMember[]
-  invites   WorkspaceInvite[]
-  channels  Channel[]
+  id            String            @id @default(uuid()) @db.Uuid
+  name          String            @db.VarChar(100)
+  createdAt     DateTime          @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime          @updatedAt @db.Timestamptz(3)
+  members       WorkspaceMember[]
+  invites       WorkspaceInvite[]
+  channels      Channel[]
+  announcements Announcement[]
+}
+
+model Announcement {
+  id              String    @id @default(uuid()) @db.Uuid
+  workspaceId     String    @db.Uuid
+  authorId        String    @db.Uuid
+  title           String    @db.VarChar(200)
+  content         String    @db.VarChar(4000)
+  publishAt       DateTime? @db.Timestamptz(3)
+  publishedAt     DateTime? @db.Timestamptz(3)
+  scheduleVersion Int       @default(0)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+  workspace       Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  author          User      @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([workspaceId, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([workspaceId, publishedAt, createdAt(sort: Desc), id(sort: Desc)])
+  @@index([publishedAt, publishAt])
 }
 
 model Channel {

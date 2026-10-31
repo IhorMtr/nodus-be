@@ -1,6 +1,13 @@
 import { SOCKET_EVENTS } from '../socket/socket-events.js';
-import { channelRoom, channelRoomPrefix, userRoom } from '../socket/socket.rooms.js';
-import type { ClientToServerEvents, ServerToClientEvents } from '../socket/socket.types.js';
+import {
+  channelRoom,
+  channelRoomPrefix,
+  userRoom,
+} from '../socket/socket.rooms.js';
+import type {
+  ClientToServerEvents,
+  ServerToClientEvents,
+} from '../socket/socket.types.js';
 
 // ==================== CONSTANTS ====================
 
@@ -26,11 +33,19 @@ const received = <E extends keyof ClientToServerEvents>(event: E): E => event;
 const sent = <E extends keyof ServerToClientEvents>(event: E): E => event;
 
 const schemaRef = (name: string) => ({ $ref: `#/components/schemas/${name}` });
-const messageRef = (name: string) => ({ $ref: `#/components/messages/${name}` });
+const messageRef = (name: string) => ({
+  $ref: `#/components/messages/${name}`,
+});
 const channelRef = (name: string) => ({ $ref: `#/channels/${name}` });
-const channelMessageRef = (channel: string, message: string) => ({ $ref: `#/channels/${channel}/messages/${message}` });
+const channelMessageRef = (channel: string, message: string) => ({
+  $ref: `#/channels/${channel}/messages/${message}`,
+});
 
-const uuid = (description: string) => ({ type: 'string', format: 'uuid', description });
+const uuid = (description: string) => ({
+  type: 'string',
+  format: 'uuid',
+  description,
+});
 
 // ==================== DESCRIPTIONS ====================
 
@@ -146,7 +161,8 @@ The socket connection stays open. Rooms of other workspaces and the user's acces
 
 const channelAck = (errors: readonly string[]) => ({
   optional: true,
-  description: 'Socket.IO acknowledgement callback, passed as the last argument of emit.',
+  description:
+    'Socket.IO acknowledgement callback, passed as the last argument of emit.',
   payload: schemaRef('SocketAck'),
   errors,
 });
@@ -204,14 +220,16 @@ export const asyncApiDocument = {
     channelJoin: {
       address: received(SOCKET_EVENTS.CHANNEL_JOIN),
       title: 'Join a channel room',
-      summary: 'The client asks to be subscribed to the realtime events of one channel.',
+      summary:
+        'The client asks to be subscribed to the realtime events of one channel.',
       messages: { ChannelJoin: messageRef('ChannelJoin') },
       'x-socketio-room': { name: CHANNEL_ROOM, effect: 'join' },
     },
     channelLeave: {
       address: received(SOCKET_EVENTS.CHANNEL_LEAVE),
       title: 'Leave a channel room',
-      summary: 'The client unsubscribes from the realtime events of one channel.',
+      summary:
+        'The client unsubscribes from the realtime events of one channel.',
       messages: { ChannelLeave: messageRef('ChannelLeave') },
       'x-socketio-room': { name: CHANNEL_ROOM, effect: 'leave' },
     },
@@ -240,7 +258,9 @@ export const asyncApiDocument = {
       address: sent(SOCKET_EVENTS.WORKSPACE_ACCESS_REVOKED),
       title: 'Workspace access was revoked',
       summary: 'The user has been removed from a workspace.',
-      messages: { WorkspaceAccessRevoked: messageRef('WorkspaceAccessRevoked') },
+      messages: {
+        WorkspaceAccessRevoked: messageRef('WorkspaceAccessRevoked'),
+      },
       'x-socketio-room': { name: USER_ROOM, effect: 'emit' },
     },
   },
@@ -252,7 +272,12 @@ export const asyncApiDocument = {
       summary: 'Receive a channel subscription request from the client.',
       description: joinChannelDescription,
       messages: [channelMessageRef('channelJoin', 'ChannelJoin')],
-      'x-ack': channelAck(['ValidationFailed', 'WorkspaceNotFound', 'ChannelNotFound', 'InternalError']),
+      'x-ack': channelAck([
+        'ValidationFailed',
+        'WorkspaceNotFound',
+        'ChannelNotFound',
+        'InternalError',
+      ]),
     },
     leaveChannel: {
       action: 'receive',
@@ -291,9 +316,12 @@ export const asyncApiDocument = {
       action: 'send',
       channel: channelRef('workspaceAccessRevoked'),
       title: 'Publish a workspace access revocation',
-      summary: 'Send workspace:access-revoked to every socket of the removed user.',
+      summary:
+        'Send workspace:access-revoked to every socket of the removed user.',
       description: workspaceAccessRevokedDescription,
-      messages: [channelMessageRef('workspaceAccessRevoked', 'WorkspaceAccessRevoked')],
+      messages: [
+        channelMessageRef('workspaceAccessRevoked', 'WorkspaceAccessRevoked'),
+      ],
     },
   },
   components: {
@@ -304,10 +332,15 @@ export const asyncApiDocument = {
         summary: 'Subscribe the socket to a channel.',
         contentType: 'application/json',
         payload: schemaRef('ChannelSubscription'),
-        examples: [{
-          name: 'JoinChannel',
-          payload: { workspaceId: EXAMPLE_IDS.workspace, channelId: EXAMPLE_IDS.channel },
-        }],
+        examples: [
+          {
+            name: 'JoinChannel',
+            payload: {
+              workspaceId: EXAMPLE_IDS.workspace,
+              channelId: EXAMPLE_IDS.channel,
+            },
+          },
+        ],
       },
       ChannelLeave: {
         name: SOCKET_EVENTS.CHANNEL_LEAVE,
@@ -315,10 +348,15 @@ export const asyncApiDocument = {
         summary: 'Unsubscribe the socket from a channel.',
         contentType: 'application/json',
         payload: schemaRef('ChannelSubscription'),
-        examples: [{
-          name: 'LeaveChannel',
-          payload: { workspaceId: EXAMPLE_IDS.workspace, channelId: EXAMPLE_IDS.channel },
-        }],
+        examples: [
+          {
+            name: 'LeaveChannel',
+            payload: {
+              workspaceId: EXAMPLE_IDS.workspace,
+              channelId: EXAMPLE_IDS.channel,
+            },
+          },
+        ],
       },
       MessageCreated: {
         name: SOCKET_EVENTS.MESSAGE_CREATED,
@@ -326,20 +364,26 @@ export const asyncApiDocument = {
         summary: 'A message was created in a channel the socket has joined.',
         contentType: 'application/json',
         payload: schemaRef('MessagePayload'),
-        examples: [{
-          name: 'MessageCreated',
-          payload: {
-            workspaceId: EXAMPLE_IDS.workspace,
-            message: {
-              id: EXAMPLE_IDS.message,
-              channelId: EXAMPLE_IDS.channel,
-              author: { id: EXAMPLE_IDS.user, firstName: 'John', lastName: 'Doe' },
-              content: 'Hello everyone',
-              createdAt: '2026-10-25T12:00:00.000Z',
-              updatedAt: '2026-10-25T12:00:00.000Z',
+        examples: [
+          {
+            name: 'MessageCreated',
+            payload: {
+              workspaceId: EXAMPLE_IDS.workspace,
+              message: {
+                id: EXAMPLE_IDS.message,
+                channelId: EXAMPLE_IDS.channel,
+                author: {
+                  id: EXAMPLE_IDS.user,
+                  firstName: 'John',
+                  lastName: 'Doe',
+                },
+                content: 'Hello everyone',
+                createdAt: '2026-10-25T12:00:00.000Z',
+                updatedAt: '2026-10-25T12:00:00.000Z',
+              },
             },
           },
-        }],
+        ],
       },
       MessageUpdated: {
         name: SOCKET_EVENTS.MESSAGE_UPDATED,
@@ -347,20 +391,26 @@ export const asyncApiDocument = {
         summary: 'A message was edited in a channel the socket has joined.',
         contentType: 'application/json',
         payload: schemaRef('MessagePayload'),
-        examples: [{
-          name: 'MessageUpdated',
-          payload: {
-            workspaceId: EXAMPLE_IDS.workspace,
-            message: {
-              id: EXAMPLE_IDS.message,
-              channelId: EXAMPLE_IDS.channel,
-              author: { id: EXAMPLE_IDS.user, firstName: 'John', lastName: 'Doe' },
-              content: 'Hello everyone, edited',
-              createdAt: '2026-10-25T12:00:00.000Z',
-              updatedAt: '2026-10-25T12:05:00.000Z',
+        examples: [
+          {
+            name: 'MessageUpdated',
+            payload: {
+              workspaceId: EXAMPLE_IDS.workspace,
+              message: {
+                id: EXAMPLE_IDS.message,
+                channelId: EXAMPLE_IDS.channel,
+                author: {
+                  id: EXAMPLE_IDS.user,
+                  firstName: 'John',
+                  lastName: 'Doe',
+                },
+                content: 'Hello everyone, edited',
+                createdAt: '2026-10-25T12:00:00.000Z',
+                updatedAt: '2026-10-25T12:05:00.000Z',
+              },
             },
           },
-        }],
+        ],
       },
       MessageDeleted: {
         name: SOCKET_EVENTS.MESSAGE_DELETED,
@@ -368,14 +418,16 @@ export const asyncApiDocument = {
         summary: 'A message was deleted in a channel the socket has joined.',
         contentType: 'application/json',
         payload: schemaRef('MessageDeletedPayload'),
-        examples: [{
-          name: 'MessageDeleted',
-          payload: {
-            workspaceId: EXAMPLE_IDS.workspace,
-            channelId: EXAMPLE_IDS.channel,
-            messageId: EXAMPLE_IDS.message,
+        examples: [
+          {
+            name: 'MessageDeleted',
+            payload: {
+              workspaceId: EXAMPLE_IDS.workspace,
+              channelId: EXAMPLE_IDS.channel,
+              messageId: EXAMPLE_IDS.message,
+            },
           },
-        }],
+        ],
       },
       WorkspaceAccessRevoked: {
         name: SOCKET_EVENTS.WORKSPACE_ACCESS_REVOKED,
@@ -383,16 +435,19 @@ export const asyncApiDocument = {
         summary: 'The user was removed from a workspace.',
         contentType: 'application/json',
         payload: schemaRef('WorkspaceAccessRevokedPayload'),
-        examples: [{
-          name: 'AccessRevoked',
-          payload: { workspaceId: EXAMPLE_IDS.workspace },
-        }],
+        examples: [
+          {
+            name: 'AccessRevoked',
+            payload: { workspaceId: EXAMPLE_IDS.workspace },
+          },
+        ],
       },
     },
     schemas: {
       ChannelSubscription: {
         type: 'object',
-        description: 'Identifies a channel. Ids are case-insensitive UUIDs and are normalized to lowercase by the server.',
+        description:
+          'Identifies a channel. Ids are case-insensitive UUIDs and are normalized to lowercase by the server.',
         required: ['workspaceId', 'channelId'],
         additionalProperties: false,
         properties: {
@@ -401,7 +456,8 @@ export const asyncApiDocument = {
         },
       },
       SocketAck: {
-        description: 'Acknowledgement of channel:join and channel:leave. It has the same envelope as the REST API responses.',
+        description:
+          'Acknowledgement of channel:join and channel:leave. It has the same envelope as the REST API responses.',
         oneOf: [schemaRef('SocketAckSuccess'), schemaRef('SocketAckError')],
       },
       SocketAckSuccess: {
@@ -424,7 +480,12 @@ export const asyncApiDocument = {
           data: { type: 'null' },
           messageType: {
             type: 'string',
-            enum: ['ValidationFailed', 'WorkspaceNotFound', 'ChannelNotFound', 'InternalError'],
+            enum: [
+              'ValidationFailed',
+              'WorkspaceNotFound',
+              'ChannelNotFound',
+              'InternalError',
+            ],
             description: 'Machine-readable application error code.',
           },
           errors: { type: 'null' },
@@ -432,7 +493,8 @@ export const asyncApiDocument = {
       },
       MessageAuthor: {
         type: 'object',
-        description: 'Public author information. Email, password hashes, sessions and tokens are never included.',
+        description:
+          'Public author information. Email, password hashes, sessions and tokens are never included.',
         required: ['id', 'firstName', 'lastName'],
         additionalProperties: false,
         properties: {
@@ -444,7 +506,14 @@ export const asyncApiDocument = {
       PublicMessage: {
         type: 'object',
         description: 'The public message shape returned by the REST API.',
-        required: ['id', 'channelId', 'author', 'content', 'createdAt', 'updatedAt'],
+        required: [
+          'id',
+          'channelId',
+          'author',
+          'content',
+          'createdAt',
+          'updatedAt',
+        ],
         additionalProperties: false,
         properties: {
           id: uuid('Message id.'),
@@ -461,7 +530,8 @@ export const asyncApiDocument = {
           updatedAt: {
             type: 'string',
             format: 'date-time',
-            description: 'Timestamp of the most recent update. There is no separate edited flag or version history.',
+            description:
+              'Timestamp of the most recent update. There is no separate edited flag or version history.',
           },
         },
       },
@@ -477,7 +547,8 @@ export const asyncApiDocument = {
       },
       MessageDeletedPayload: {
         type: 'object',
-        description: 'Payload of message:deleted. The message no longer exists in the database.',
+        description:
+          'Payload of message:deleted. The message no longer exists in the database.',
         required: ['workspaceId', 'channelId', 'messageId'],
         additionalProperties: false,
         properties: {
@@ -500,11 +571,13 @@ export const asyncApiDocument = {
   'x-socketio-rooms': {
     user: {
       name: USER_ROOM,
-      description: 'Joined automatically after authentication. Contains every socket of one user. Not controlled by clients.',
+      description:
+        'Joined automatically after authentication. Contains every socket of one user. Not controlled by clients.',
     },
     channel: {
       name: CHANNEL_ROOM,
-      description: 'Joined with channel:join after server-side authorization and left with channel:leave. Delivery scope of the message events.',
+      description:
+        'Joined with channel:join after server-side authorization and left with channel:leave. Delivery scope of the message events.',
     },
   },
 };

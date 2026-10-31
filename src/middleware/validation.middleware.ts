@@ -3,18 +3,32 @@ import type { ZodType } from 'zod';
 import { AppError } from '../shared/errors/app-error.js';
 import type { FieldErrors } from '../shared/types/api-response.js';
 
-function validateRequest(schema: ZodType, target: 'body' | 'params' | 'query'): RequestHandler {
+// ==================== VALIDATION ====================
+
+function validateRequest(
+  schema: ZodType,
+  target: 'body' | 'params' | 'query'
+): RequestHandler {
   return (req, res, next) => {
     const result = schema.safeParse(req[target]);
     if (!result.success) {
       const errors: FieldErrors = {};
       for (const issue of result.error.issues) {
         const field = issue.path.join('.') || '_form';
-        (errors[field] ??= []).push(issue.code === 'unrecognized_keys'
-          ? `Unexpected fields in request ${target}`
-          : issue.message);
+        (errors[field] ??= []).push(
+          issue.code === 'unrecognized_keys'
+            ? `Unexpected fields in request ${target}`
+            : issue.message
+        );
       }
-      next(new AppError('Request validation failed', 400, 'ValidationFailed', errors));
+      next(
+        new AppError(
+          'Request validation failed',
+          400,
+          'ValidationFailed',
+          errors
+        )
+      );
       return;
     }
 
@@ -29,6 +43,8 @@ function validateRequest(schema: ZodType, target: 'body' | 'params' | 'query'): 
     next();
   };
 }
+
+// ==================== PUBLIC API ====================
 
 export function validateBody(schema: ZodType): RequestHandler {
   return validateRequest(schema, 'body');

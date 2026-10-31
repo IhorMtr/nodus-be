@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { loginSchema, registerSchema } from '../../src/modules/auth/auth.schema.js';
+import {
+  loginSchema,
+  registerSchema,
+} from '../../src/modules/auth/auth.schema.js';
 
 // ==================== REGISTRATION ====================
 
@@ -44,7 +47,11 @@ describe('registerSchema', () => {
 
   it('rejects a password shorter than eight characters', () => {
     // Arrange
-    const input = { ...validRegistration, password: 'Aa12345', confirmPassword: 'Aa12345' };
+    const input = {
+      ...validRegistration,
+      password: 'Aa12345',
+      confirmPassword: 'Aa12345',
+    };
 
     // Act
     const result = registerSchema.safeParse(input);
@@ -58,14 +65,16 @@ describe('registerSchema', () => {
     const cases = ['password1', 'Password'];
 
     // Act
-    const results = cases.map((password) => registerSchema.safeParse({
-      ...validRegistration,
-      password,
-      confirmPassword: password,
-    }));
+    const results = cases.map(password =>
+      registerSchema.safeParse({
+        ...validRegistration,
+        password,
+        confirmPassword: password,
+      })
+    );
 
     // Assert
-    expect(results.every((result) => !result.success)).toBe(true);
+    expect(results.every(result => !result.success)).toBe(true);
   });
 
   it('rejects mismatched confirmation and unknown fields', () => {
@@ -114,13 +123,19 @@ describe('loginSchema', () => {
 
   it('rejects missing passwords and malformed email addresses', () => {
     // Arrange
-    const missingPassword = loginSchema.safeParse({ email: 'ada@example.com', password: '' });
-    const invalidEmail = loginSchema.safeParse({ email: 'invalid', password: 'secret' });
+    const missingPassword = loginSchema.safeParse({
+      email: 'ada@example.com',
+      password: '',
+    });
+    const invalidEmail = loginSchema.safeParse({
+      email: 'invalid',
+      password: 'secret',
+    });
 
     // Act
     const results = [missingPassword, invalidEmail];
 
     // Assert
-    expect(results.every((result) => !result.success)).toBe(true);
+    expect(results.every(result => !result.success)).toBe(true);
   });
 });

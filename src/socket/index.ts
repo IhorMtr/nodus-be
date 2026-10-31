@@ -31,7 +31,7 @@ export function initializeSocket(httpServer: HttpServer): SocketServer {
   bindSocketPublisher(io);
   io.use(authenticateSocket);
 
-  io.on(SOCKET_EVENTS.CONNECTION, (socket) => {
+  io.on(SOCKET_EVENTS.CONNECTION, socket => {
     const { userId } = socket.data;
     logger.info({ socketId: socket.id, userId }, 'Socket connected');
 
@@ -39,8 +39,11 @@ export function initializeSocket(httpServer: HttpServer): SocketServer {
     void socket.join(userRoom(userId));
     registerChannelHandlers(socket);
 
-    socket.on(SOCKET_EVENTS.DISCONNECT, (reason) => {
-      logger.debug({ socketId: socket.id, userId, reason }, 'Socket disconnected');
+    socket.on(SOCKET_EVENTS.DISCONNECT, reason => {
+      logger.debug(
+        { socketId: socket.id, userId, reason },
+        'Socket disconnected'
+      );
     });
   });
 

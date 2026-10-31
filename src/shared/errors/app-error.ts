@@ -5,7 +5,7 @@ export class AppError extends Error {
     message: string,
     public readonly statusCode: number,
     public readonly code = 'ApplicationError',
-    public readonly fieldErrors: FieldErrors | null = null,
+    public readonly fieldErrors: FieldErrors | null = null
   ) {
     super(message);
     this.name = 'AppError';

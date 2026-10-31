@@ -11,7 +11,9 @@ declare module 'express-serve-static-core' {
 
 export const authenticate: RequestHandler = (req, _res, next) => {
   const authorization = req.get('Authorization');
-  const match = authorization?.match(/^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i);
+  const match = authorization?.match(
+    /^Bearer ([A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+)$/i
+  );
   const token = match?.[1];
   if (!token) {
     next(new AppError('Access token is required', 401, 'Unauthorized'));

@@ -23,18 +23,23 @@ function createMessage(channelId: string, authorId: string, content: string) {
   });
 }
 
-function listChannelMessages(channelId: string, { limit, before }: MessageHistoryQuery) {
+function listChannelMessages(
+  channelId: string,
+  { limit, before }: MessageHistoryQuery
+) {
   return prisma.message.findMany({
     where: {
       channelId,
-      ...(before ? {
-        // Bound the index scan before applying the UUID tie-breaker.
-        createdAt: { lte: before.createdAt },
-        OR: [
-          { createdAt: { lt: before.createdAt } },
-          { createdAt: before.createdAt, id: { lt: before.id } },
-        ],
-      } : {}),
+      ...(before
+        ? {
+            // Bound the index scan before applying the UUID tie-breaker.
+            createdAt: { lte: before.createdAt },
+            OR: [
+              { createdAt: { lt: before.createdAt } },
+              { createdAt: before.createdAt, id: { lt: before.id } },
+            ],
+          }
+        : {}),
     },
     select: messageSelect,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -57,7 +62,10 @@ function updateMessage(channelId: string, messageId: string, content: string) {
   });
 }
 
-async function deleteMessage(channelId: string, messageId: string): Promise<void> {
+async function deleteMessage(
+  channelId: string,
+  messageId: string
+): Promise<void> {
   await prisma.message.delete({
     where: { id: messageId, channelId },
     select: { id: true },
@@ -67,11 +75,17 @@ async function deleteMessage(channelId: string, messageId: string): Promise<void
 // ==================== DATABASE ERRORS ====================
 
 export function isMessageNotFoundError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025';
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2025'
+  );
 }
 
 export function isMessageRelationMissingError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2003';
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2003'
+  );
 }
 
 // ==================== PUBLIC API ====================

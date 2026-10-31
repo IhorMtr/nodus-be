@@ -13,7 +13,7 @@ const requestBody = (name: string): OpenAPIV3.RequestBodyObject => ({
 
 const successResponse = (
   description: string,
-  schemaName = 'AuthTokenResponse',
+  schemaName = 'AuthTokenResponse'
 ): OpenAPIV3.ResponseObject => ({
   description,
   content: { 'application/json': { schema: schemaRef(schemaName) } },
@@ -21,27 +21,35 @@ const successResponse = (
 
 const errorResponse = (
   description: string,
-  codes: readonly string[],
+  codes: readonly string[]
 ): OpenAPIV3.ResponseObject => ({
   description,
   content: {
     'application/json': {
       schema: schemaRef('ApiErrorResponse'),
-      examples: Object.fromEntries(codes.map((code) => [code, {
-        value: {
-          success: false,
-          data: null,
-          messageType: code,
-          errors: code === 'ValidationFailed'
-            ? { _form: ['Invalid request body'] }
-            : null,
-        },
-      }])),
+      examples: Object.fromEntries(
+        codes.map(code => [
+          code,
+          {
+            value: {
+              success: false,
+              data: null,
+              messageType: code,
+              errors:
+                code === 'ValidationFailed'
+                  ? { _form: ['Invalid request body'] }
+                  : null,
+            },
+          },
+        ])
+      ),
     },
   },
 });
 
-const successEnvelope = (data: OpenAPIV3.SchemaObject): OpenAPIV3.SchemaObject => ({
+const successEnvelope = (
+  data: OpenAPIV3.SchemaObject
+): OpenAPIV3.SchemaObject => ({
   type: 'object',
   required: ['success', 'data', 'messageType', 'errors'],
   additionalProperties: false,
@@ -86,7 +94,8 @@ export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
         minLength: 8,
         maxLength: 128,
         pattern: '^(?=[\\s\\S]*[A-Z])(?=[\\s\\S]*[0-9])[\\s\\S]+$',
-        description: 'At least 8 characters, with at least one uppercase ASCII letter and one digit.',
+        description:
+          'At least 8 characters, with at least one uppercase ASCII letter and one digit.',
         example: 'Password1',
       },
       confirmPassword: {
@@ -126,7 +135,8 @@ export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
         minLength: 1,
         maxLength: 4096,
         writeOnly: true,
-        description: 'Refresh token returned by registration, login, or refresh.',
+        description:
+          'Refresh token returned by registration, login, or refresh.',
       },
     },
   },
@@ -151,16 +161,22 @@ export const authSchemas: Record<string, OpenAPIV3.SchemaObject> = {
       },
     },
   }),
-  LogoutResponse: successEnvelope({ type: 'object', nullable: true, enum: [null] }),
+  LogoutResponse: successEnvelope({
+    type: 'object',
+    nullable: true,
+    enum: [null],
+  }),
 };
 
 // ==================== OPERATIONS ====================
 
-const badRequest = errorResponse(
-  'Invalid request body.',
-  ['ValidationFailed', 'InvalidJson'],
-);
-const unexpectedError = errorResponse('Unexpected server error.', ['InternalError']);
+const badRequest = errorResponse('Invalid request body.', [
+  'ValidationFailed',
+  'InvalidJson',
+]);
+const unexpectedError = errorResponse('Unexpected server error.', [
+  'InternalError',
+]);
 const rateLimit = errorResponse('Rate limit exceeded.', ['TooManyRequests']);
 
 export const authPaths: OpenAPIV3.PathsObject = {
@@ -174,7 +190,9 @@ export const authPaths: OpenAPIV3.PathsObject = {
       responses: {
         '201': successResponse('Account and session created.'),
         '400': badRequest,
-        '409': errorResponse('An account already uses this email address.', ['EmailAlreadyExists']),
+        '409': errorResponse('An account already uses this email address.', [
+          'EmailAlreadyExists',
+        ]),
         '429': rateLimit,
         '500': unexpectedError,
       },
@@ -190,7 +208,9 @@ export const authPaths: OpenAPIV3.PathsObject = {
       responses: {
         '200': successResponse('Authentication succeeded.'),
         '400': badRequest,
-        '401': errorResponse('Invalid email or password.', ['InvalidCredentials']),
+        '401': errorResponse('Invalid email or password.', [
+          'InvalidCredentials',
+        ]),
         '429': rateLimit,
         '500': unexpectedError,
       },
@@ -207,7 +227,10 @@ export const authPaths: OpenAPIV3.PathsObject = {
         '200': successResponse('Refresh token rotated.'),
         '400': badRequest,
         '401': errorResponse('Refresh token or session is invalid.', [
-          'InvalidRefreshToken', 'RefreshTokenExpired', 'SessionRevoked', 'RefreshTokenReused',
+          'InvalidRefreshToken',
+          'RefreshTokenExpired',
+          'SessionRevoked',
+          'RefreshTokenReused',
         ]),
         '500': unexpectedError,
       },
@@ -218,7 +241,8 @@ export const authPaths: OpenAPIV3.PathsObject = {
       tags: ['Auth'],
       operationId: 'logout',
       summary: 'Log out',
-      description: 'Revokes the session associated with the submitted current refresh token.',
+      description:
+        'Revokes the session associated with the submitted current refresh token.',
       requestBody: requestBody('RefreshTokenRequest'),
       responses: {
         '200': successResponse('Logout request completed.', 'LogoutResponse'),

@@ -34,10 +34,16 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
     exitCode = 1;
   }
 
-  const results = await Promise.allSettled([prisma.$disconnect(), closeRedis()]);
+  const results = await Promise.allSettled([
+    prisma.$disconnect(),
+    closeRedis(),
+  ]);
   for (const result of results) {
     if (result.status === 'rejected') {
-      logger.error({ err: result.reason }, 'Failed to close an infrastructure connection');
+      logger.error(
+        { err: result.reason },
+        'Failed to close an infrastructure connection'
+      );
       exitCode = 1;
     }
   }
@@ -49,10 +55,14 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
 
 // ==================== BOOTSTRAP ====================
 
-process.once('SIGINT', () => { void shutdown('SIGINT'); });
-process.once('SIGTERM', () => { void shutdown('SIGTERM'); });
+process.once('SIGINT', () => {
+  void shutdown('SIGINT');
+});
+process.once('SIGTERM', () => {
+  void shutdown('SIGTERM');
+});
 
-httpServer.on('error', (error) => {
+httpServer.on('error', error => {
   logger.error({ err: error }, 'HTTP server error');
   void shutdown('HTTP server error', 1);
 });
@@ -62,7 +72,10 @@ async function bootstrap(): Promise<void> {
   if (shuttingDown) return;
 
   httpServer.listen(env.PORT, () => {
-    logger.info({ port: env.PORT, environment: env.NODE_ENV }, 'Nodus backend started');
+    logger.info(
+      { port: env.PORT, environment: env.NODE_ENV },
+      'Nodus backend started'
+    );
   });
 }
 

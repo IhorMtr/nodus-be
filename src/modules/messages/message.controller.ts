@@ -23,24 +23,32 @@ import type {
 // ==================== AUTH CONTEXT ====================
 
 function authenticatedUserId(req: Request): string {
-  if (!req.auth) throw new AppError('Access token is required', 401, 'Unauthorized');
+  if (!req.auth)
+    throw new AppError('Access token is required', 401, 'Unauthorized');
   return req.auth.userId;
 }
 
 // ==================== MESSAGE LIFECYCLE ====================
 
-export const createMessage: RequestHandler<MessageChannelParams, ApiResponse<PublicMessage>, CreateMessageInput> = async (req, res) => {
+export const createMessage: RequestHandler<
+  MessageChannelParams,
+  ApiResponse<PublicMessage>,
+  CreateMessageInput
+> = async (req, res) => {
   const message = await messageService.createMessage(
     req.params.workspaceId,
     authenticatedUserId(req),
     req.params.channelId,
-    req.body,
+    req.body
   );
-  logger.info({
-    workspaceId: req.params.workspaceId,
-    channelId: req.params.channelId,
-    messageId: message.id,
-  }, 'Message created, invoking realtime publisher');
+  logger.info(
+    {
+      workspaceId: req.params.workspaceId,
+      channelId: req.params.channelId,
+      messageId: message.id,
+    },
+    'Message created, invoking realtime publisher'
+  );
   publishMessageCreated(req.params.workspaceId, message);
   res.status(201).json(successResponse(message));
 };
@@ -56,30 +64,41 @@ export const listMessages: RequestHandler<
     req.params.workspaceId,
     authenticatedUserId(req),
     req.params.channelId,
-    res.locals.validatedQuery,
+    res.locals.validatedQuery
   );
   res.json(successResponse(history));
 };
 
-export const updateMessage: RequestHandler<MessageParams, ApiResponse<PublicMessage>, UpdateMessageInput> = async (req, res) => {
+export const updateMessage: RequestHandler<
+  MessageParams,
+  ApiResponse<PublicMessage>,
+  UpdateMessageInput
+> = async (req, res) => {
   const message = await messageService.updateMessage(
     req.params.workspaceId,
     authenticatedUserId(req),
     req.params.channelId,
     req.params.messageId,
-    req.body,
+    req.body
   );
   publishMessageUpdated(req.params.workspaceId, message);
   res.json(successResponse(message));
 };
 
-export const deleteMessage: RequestHandler<MessageParams, ApiResponse<null>> = async (req, res) => {
+export const deleteMessage: RequestHandler<
+  MessageParams,
+  ApiResponse<null>
+> = async (req, res) => {
   await messageService.deleteMessage(
     req.params.workspaceId,
     authenticatedUserId(req),
     req.params.channelId,
-    req.params.messageId,
+    req.params.messageId
   );
-  publishMessageDeleted(req.params.workspaceId, req.params.channelId, req.params.messageId);
+  publishMessageDeleted(
+    req.params.workspaceId,
+    req.params.channelId,
+    req.params.messageId
+  );
   res.json(successResponse(null));
 };

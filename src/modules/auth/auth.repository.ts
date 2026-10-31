@@ -84,7 +84,9 @@ async function rotateSessionToken(rotation: SessionRotation): Promise<boolean> {
   return result.count === 1;
 }
 
-async function revokeSessionByTokenHash(refreshTokenHash: string): Promise<void> {
+async function revokeSessionByTokenHash(
+  refreshTokenHash: string
+): Promise<void> {
   await prisma.authSession.updateMany({
     where: { refreshTokenHash, revokedAt: null },
     data: { revokedAt: new Date() },
@@ -94,7 +96,10 @@ async function revokeSessionByTokenHash(refreshTokenHash: string): Promise<void>
 // ==================== PUBLIC API ====================
 
 export function isUniqueEmailError(error: unknown): boolean {
-  if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== 'P2002'
+  ) {
     return false;
   }
   const target: unknown = error.meta?.['target'];
@@ -103,19 +108,22 @@ export function isUniqueEmailError(error: unknown): boolean {
   }
 
   // Prisma's PostgreSQL driver adapter reports the database constraint name.
-  const adapterError = z.object({
-    cause: z.object({
-      kind: z.literal('UniqueConstraintViolation'),
-      constraint: z.object({
-        index: z.string().optional(),
-        fields: z.array(z.string()).optional(),
+  const adapterError = z
+    .object({
+      cause: z.object({
+        kind: z.literal('UniqueConstraintViolation'),
+        constraint: z.object({
+          index: z.string().optional(),
+          fields: z.array(z.string()).optional(),
+        }),
       }),
-    }),
-  }).safeParse(error.meta?.['driverAdapterError']);
+    })
+    .safeParse(error.meta?.['driverAdapterError']);
 
-  return adapterError.success && (
-    adapterError.data.cause.constraint.index === 'User_email_key' ||
-    adapterError.data.cause.constraint.fields?.includes('email') === true
+  return (
+    adapterError.success &&
+    (adapterError.data.cause.constraint.index === 'User_email_key' ||
+      adapterError.data.cause.constraint.fields?.includes('email') === true)
   );
 }
 

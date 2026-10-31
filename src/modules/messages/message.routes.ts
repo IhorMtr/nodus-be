@@ -1,7 +1,16 @@
 import { Router } from 'express';
 import { authenticate } from '../../middleware/auth.middleware.js';
-import { validateBody, validateParams, validateQuery } from '../../middleware/validation.middleware.js';
-import { createMessage, deleteMessage, listMessages, updateMessage } from './message.controller.js';
+import {
+  validateBody,
+  validateParams,
+  validateQuery,
+} from '../../middleware/validation.middleware.js';
+import {
+  createMessage,
+  deleteMessage,
+  listMessages,
+  updateMessage,
+} from './message.controller.js';
 import {
   createMessageSchema,
   messageChannelParamsSchema,
@@ -9,6 +18,8 @@ import {
   messageParamsSchema,
   updateMessageSchema,
 } from './message.schema.js';
+
+// ==================== MIDDLEWARE ====================
 
 export const messageRouter = Router({ mergeParams: true });
 
@@ -18,26 +29,28 @@ messageRouter.use((_req, res, next) => {
   next();
 });
 
+// ==================== ROUTES ====================
+
 messageRouter.post(
   '/',
   validateParams(messageChannelParamsSchema),
   validateBody(createMessageSchema),
-  createMessage,
+  createMessage
 );
 messageRouter.get(
   '/',
   validateParams(messageChannelParamsSchema),
   validateQuery(messageHistoryQuerySchema),
-  listMessages,
+  listMessages
 );
 messageRouter.patch(
   '/:messageId',
   validateParams(messageParamsSchema),
   validateBody(updateMessageSchema),
-  updateMessage,
+  updateMessage
 );
 messageRouter.delete(
   '/:messageId',
   validateParams(messageParamsSchema),
-  deleteMessage,
+  deleteMessage
 );

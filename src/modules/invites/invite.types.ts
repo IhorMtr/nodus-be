@@ -1,8 +1,12 @@
 import type { z } from 'zod';
 import type { inviteParamsSchema, inviteTokenSchema } from './invite.schema.js';
 
+// ==================== REQUEST TYPES ====================
+
 export type InviteTokenInput = z.infer<typeof inviteTokenSchema>;
 export type InviteParams = z.infer<typeof inviteParamsSchema>;
+
+// ==================== RESPONSE TYPES ====================
 
 export type PublicInvite = {
   id: string;

@@ -7,24 +7,44 @@ import type { refreshTokenSchema } from './auth.schema.js';
 import { authService } from './auth.service.js';
 import type { AuthTokens, LoginInput, RegisterInput } from './auth.types.js';
 
+// ==================== TYPES ====================
+
 type RefreshTokenInput = z.infer<typeof refreshTokenSchema>;
 
-export const register: RequestHandler<ParamsDictionary, ApiResponse<AuthTokens>, RegisterInput> = async (req, res) => {
+// ==================== HANDLERS ====================
+
+export const register: RequestHandler<
+  ParamsDictionary,
+  ApiResponse<AuthTokens>,
+  RegisterInput
+> = async (req, res) => {
   const tokens = await authService.register(req.body);
   res.status(201).json(successResponse(tokens));
 };
 
-export const login: RequestHandler<ParamsDictionary, ApiResponse<AuthTokens>, LoginInput> = async (req, res) => {
+export const login: RequestHandler<
+  ParamsDictionary,
+  ApiResponse<AuthTokens>,
+  LoginInput
+> = async (req, res) => {
   const tokens = await authService.login(req.body);
   res.json(successResponse(tokens));
 };
 
-export const refresh: RequestHandler<ParamsDictionary, ApiResponse<AuthTokens>, RefreshTokenInput> = async (req, res) => {
+export const refresh: RequestHandler<
+  ParamsDictionary,
+  ApiResponse<AuthTokens>,
+  RefreshTokenInput
+> = async (req, res) => {
   const tokens = await authService.refresh(req.body.refreshToken);
   res.json(successResponse(tokens));
 };
 
-export const logout: RequestHandler<ParamsDictionary, ApiResponse<null>, RefreshTokenInput> = async (req, res) => {
+export const logout: RequestHandler<
+  ParamsDictionary,
+  ApiResponse<null>,
+  RefreshTokenInput
+> = async (req, res) => {
   await authService.logout(req.body.refreshToken);
   res.json(successResponse(null));
 };

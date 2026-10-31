@@ -1,21 +1,21 @@
-import type { Request, RequestHandler } from "express";
-import { AppError } from "../../shared/errors/app-error.js";
-import type { ApiResponse } from "../../shared/types/api-response.js";
-import { successResponse } from "../../shared/utils/api-response.js";
-import { channelService } from "./channel.service.js";
+import type { Request, RequestHandler } from 'express';
+import { AppError } from '../../shared/errors/app-error.js';
+import type { ApiResponse } from '../../shared/types/api-response.js';
+import { successResponse } from '../../shared/utils/api-response.js';
+import { channelService } from './channel.service.js';
 import type {
   ChannelParams,
   ChannelWorkspaceParams,
   CreateChannelInput,
   PublicChannel,
   UpdateChannelInput,
-} from "./channel.types.js";
+} from './channel.types.js';
 
 // ==================== AUTH CONTEXT ====================
 
 function authenticatedUserId(req: Request): string {
   if (!req.auth)
-    throw new AppError("Access token is required", 401, "Unauthorized");
+    throw new AppError('Access token is required', 401, 'Unauthorized');
   return req.auth.userId;
 }
 
@@ -29,7 +29,7 @@ export const createChannel: RequestHandler<
   const channel = await channelService.createChannel(
     req.params.workspaceId,
     authenticatedUserId(req),
-    req.body,
+    req.body
   );
   res.status(201).json(successResponse(channel));
 };
@@ -40,7 +40,7 @@ export const listChannels: RequestHandler<
 > = async (req, res) => {
   const channels = await channelService.listChannels(
     req.params.workspaceId,
-    authenticatedUserId(req),
+    authenticatedUserId(req)
   );
   res.json(successResponse(channels));
 };
@@ -52,7 +52,7 @@ export const getChannel: RequestHandler<
   const channel = await channelService.getChannel(
     req.params.workspaceId,
     authenticatedUserId(req),
-    req.params.channelId,
+    req.params.channelId
   );
   res.json(successResponse(channel));
 };
@@ -66,7 +66,7 @@ export const updateChannel: RequestHandler<
     req.params.workspaceId,
     authenticatedUserId(req),
     req.params.channelId,
-    req.body,
+    req.body
   );
   res.json(successResponse(channel));
 };
@@ -78,7 +78,7 @@ export const deleteChannel: RequestHandler<
   await channelService.deleteChannel(
     req.params.workspaceId,
     authenticatedUserId(req),
-    req.params.channelId,
+    req.params.channelId
   );
   res.json(successResponse(null));
 };

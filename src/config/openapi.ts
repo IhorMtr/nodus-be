@@ -1,11 +1,27 @@
 import type { OpenAPIV3 } from 'openapi-types';
 
 import { authPaths, authSchemas } from '../modules/auth/auth.openapi.js';
-import { channelPaths, channelSchemas } from '../modules/channels/channel.openapi.js';
-import { messagePaths, messageSchemas } from '../modules/messages/message.openapi.js';
-import { invitePaths, inviteSchemas } from '../modules/invites/invite.openapi.js';
+import {
+  announcementPaths,
+  announcementSchemas,
+} from '../modules/announcements/announcement.openapi.js';
+import {
+  channelPaths,
+  channelSchemas,
+} from '../modules/channels/channel.openapi.js';
+import {
+  messagePaths,
+  messageSchemas,
+} from '../modules/messages/message.openapi.js';
+import {
+  invitePaths,
+  inviteSchemas,
+} from '../modules/invites/invite.openapi.js';
 import { userPaths, userSchemas } from '../modules/users/user.openapi.js';
-import { workspacePaths, workspaceSchemas } from '../modules/workspaces/workspace.openapi.js';
+import {
+  workspacePaths,
+  workspaceSchemas,
+} from '../modules/workspaces/workspace.openapi.js';
 
 export const openApiDocument: OpenAPIV3.Document = {
   openapi: '3.0.3',
@@ -17,10 +33,24 @@ export const openApiDocument: OpenAPIV3.Document = {
   tags: [
     { name: 'Auth', description: 'User authentication.' },
     { name: 'Users', description: 'The authenticated current user.' },
-    { name: 'Workspaces', description: 'Workspaces, memberships, and basic role authorization.' },
-    { name: 'Channels', description: 'Workspace channels and workspace role authorization.' },
-    { name: 'Messages', description: 'Channel messages, cursor-based history, and author or moderator permissions.' },
+    {
+      name: 'Workspaces',
+      description: 'Workspaces, memberships, and basic role authorization.',
+    },
+    {
+      name: 'Channels',
+      description: 'Workspace channels and workspace role authorization.',
+    },
+    {
+      name: 'Messages',
+      description:
+        'Channel messages, cursor-based history, and author or moderator permissions.',
+    },
     { name: 'Invites', description: 'Single use workspace invitation links.' },
+    {
+      name: 'Announcements',
+      description: 'Workspace announcements and scheduled publication.',
+    },
   ],
   components: {
     securitySchemes: {
@@ -28,7 +58,8 @@ export const openApiDocument: OpenAPIV3.Document = {
         type: 'http',
         scheme: 'bearer',
         bearerFormat: 'JWT',
-        description: 'Access token sent as Authorization: Bearer <accessToken>. Refresh tokens and cookies are not accepted.',
+        description:
+          'Access token sent as Authorization: Bearer <accessToken>. Refresh tokens and cookies are not accepted.',
       },
     },
     schemas: {
@@ -47,7 +78,8 @@ export const openApiDocument: OpenAPIV3.Document = {
             type: 'object',
             nullable: true,
             additionalProperties: { type: 'array', items: { type: 'string' } },
-            description: 'Field validation messages, or null when there are no field errors. Request-level messages use _form.',
+            description:
+              'Field validation messages, or null when there are no field errors. Request-level messages use _form.',
           },
         },
       },
@@ -57,6 +89,7 @@ export const openApiDocument: OpenAPIV3.Document = {
       ...channelSchemas,
       ...messageSchemas,
       ...inviteSchemas,
+      ...announcementSchemas,
     },
   },
   paths: {
@@ -80,12 +113,21 @@ export const openApiDocument: OpenAPIV3.Document = {
                       properties: { status: { type: 'string', enum: ['ok'] } },
                       additionalProperties: false,
                     },
-                    messageType: { type: 'string', nullable: true, enum: [null] },
+                    messageType: {
+                      type: 'string',
+                      nullable: true,
+                      enum: [null],
+                    },
                     errors: { type: 'object', nullable: true, enum: [null] },
                   },
                   additionalProperties: false,
                 },
-                example: { success: true, data: { status: 'ok' }, messageType: null, errors: null },
+                example: {
+                  success: true,
+                  data: { status: 'ok' },
+                  messageType: null,
+                  errors: null,
+                },
               },
             },
           },
@@ -98,6 +140,6 @@ export const openApiDocument: OpenAPIV3.Document = {
     ...channelPaths,
     ...messagePaths,
     ...invitePaths,
+    ...announcementPaths,
   },
 };
-

@@ -8,11 +8,15 @@ import type {
   workspaceParamsSchema,
 } from './workspace.schema.js';
 
+// ==================== REQUEST TYPES ====================
+
 export type CreateWorkspaceInput = z.infer<typeof createWorkspaceSchema>;
 export type UpdateWorkspaceInput = z.infer<typeof updateWorkspaceSchema>;
 export type UpdateMemberRoleInput = z.infer<typeof updateMemberRoleSchema>;
 export type WorkspaceParams = z.infer<typeof workspaceParamsSchema>;
 export type WorkspaceMemberParams = z.infer<typeof workspaceMemberParamsSchema>;
+
+// ==================== RESPONSE TYPES ====================
 
 export type PublicWorkspace = {
   id: string;

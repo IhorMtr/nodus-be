@@ -16,13 +16,15 @@ app.disable('x-powered-by');
 // ==================== HTTP MIDDLEWARE ====================
 
 app.use(httpLogger);
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      upgradeInsecureRequests: env.NODE_ENV === 'production' ? [] : null,
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        upgradeInsecureRequests: env.NODE_ENV === 'production' ? [] : null,
+      },
     },
-  },
-}));
+  })
+);
 app.use(cors({ origin: env.CORS_ORIGINS }));
 app.use(express.json({ limit: '1mb' }));
 

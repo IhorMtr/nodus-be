@@ -50,7 +50,11 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
   function findMembership(workspaceId: string, userId: string) {
     return client.workspaceMember.findUnique({
       where: { workspaceId_userId: { workspaceId, userId } },
-      select: { userId: true, role: true, workspace: { select: workspaceSelect } },
+      select: {
+        userId: true,
+        role: true,
+        workspace: { select: workspaceSelect },
+      },
     });
   }
 
@@ -63,7 +67,10 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
   }
 
   async function deleteWorkspace(workspaceId: string): Promise<void> {
-    await client.workspace.delete({ where: { id: workspaceId }, select: { id: true } });
+    await client.workspace.delete({
+      where: { id: workspaceId },
+      select: { id: true },
+    });
   }
 
   function listMembers(workspaceId: string) {
@@ -85,7 +92,7 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
     workspaceId: string,
     userId: string,
     expectedRole: WorkspaceRole,
-    role: WorkspaceRole,
+    role: WorkspaceRole
   ): Promise<boolean> {
     const result = await client.workspaceMember.updateMany({
       where: { workspaceId, userId, role: expectedRole },
@@ -97,7 +104,7 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
   async function removeMember(
     workspaceId: string,
     userId: string,
-    expectedRole: WorkspaceRole,
+    expectedRole: WorkspaceRole
   ): Promise<boolean> {
     const result = await client.workspaceMember.deleteMany({
       where: { workspaceId, userId, role: expectedRole },
@@ -121,20 +128,26 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
 // ==================== TRANSACTIONS ====================
 
 export function isWorkspaceConflictError(error: unknown): boolean {
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2034';
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    error.code === 'P2034'
+  );
 }
 
 export async function withWorkspaceTransaction<T>(
-  callback: (repository: WorkspaceRepository) => Promise<T>,
+  callback: (repository: WorkspaceRepository) => Promise<T>
 ): Promise<T> {
   for (let attempt = 1; ; attempt += 1) {
     try {
       return await prisma.$transaction(
-        (transaction) => callback(createWorkspaceRepository(transaction)),
-        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
+        transaction => callback(createWorkspaceRepository(transaction)),
+        { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
       );
     } catch (error) {
-      if (!isWorkspaceConflictError(error) || attempt >= maxTransactionAttempts) {
+      if (
+        !isWorkspaceConflictError(error) ||
+        attempt >= maxTransactionAttempts
+      ) {
         throw error;
       }
     }

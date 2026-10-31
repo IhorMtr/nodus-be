@@ -7,20 +7,36 @@ import { env } from './env.js';
 // ==================== SENSITIVE DATA ====================
 
 const sensitiveFields = [
-  'password', 'confirmPassword', 'passwordHash', 'accessToken', 'refreshToken',
-  'refreshTokenHash', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET', 'authorization',
+  'password',
+  'confirmPassword',
+  'passwordHash',
+  'accessToken',
+  'refreshToken',
+  'refreshTokenHash',
+  'JWT_ACCESS_SECRET',
+  'JWT_REFRESH_SECRET',
+  'authorization',
 ];
 
 function serializeError(error: unknown) {
   if (!(error instanceof Error)) return { type: 'UnknownError' };
   // Database errors can embed query arguments in their messages and causes.
   const header = `${error.name}: ${error.message}`;
-  const frames = error.stack?.startsWith(header) ? error.stack.slice(header.length) : undefined;
+  const frames = error.stack?.startsWith(header)
+    ? error.stack.slice(header.length)
+    : undefined;
   return {
     type: error.name,
-    code: 'code' in error && typeof error.code === 'string' && /^[A-Z0-9_]+$/.test(error.code)
-      ? error.code : undefined,
-    stack: frames?.split('\n').filter((line) => /^\s+at /.test(line)).join('\n'),
+    code:
+      'code' in error &&
+      typeof error.code === 'string' &&
+      /^[A-Z0-9_]+$/.test(error.code)
+        ? error.code
+        : undefined,
+    stack: frames
+      ?.split('\n')
+      .filter(line => /^\s+at /.test(line))
+      .join('\n'),
   };
 }
 
@@ -31,7 +47,11 @@ export const logger = pino({
   serializers: { err: serializeError },
   redact: {
     paths: [
-      ...sensitiveFields.flatMap((field) => [field, `*.${field}`, `*.*.${field}`]),
+      ...sensitiveFields.flatMap(field => [
+        field,
+        `*.${field}`,
+        `*.*.${field}`,
+      ]),
       'req.body',
       'res.body',
       'req.headers.authorization',
@@ -40,12 +60,14 @@ export const logger = pino({
     ],
     censor: '[REDACTED]',
   },
-  ...(env.NODE_ENV === 'development' ? {
-    transport: {
-      target: 'pino-pretty',
-      options: { colorize: true, translateTime: 'SYS:standard' },
-    },
-  } : {}),
+  ...(env.NODE_ENV === 'development'
+    ? {
+        transport: {
+          target: 'pino-pretty',
+          options: { colorize: true, translateTime: 'SYS:standard' },
+        },
+      }
+    : {}),
 });
 
 // ==================== HTTP LOGGING ====================

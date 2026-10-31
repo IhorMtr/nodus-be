@@ -32,15 +32,21 @@ function toPublicMessage(message: MessageRecord): PublicMessage {
 }
 
 function encodeCursor(message: MessageCursor): string {
-  return Buffer.from(JSON.stringify({
-    createdAt: message.createdAt.toISOString(),
-    id: message.id,
-  })).toString('base64url');
+  return Buffer.from(
+    JSON.stringify({
+      createdAt: message.createdAt.toISOString(),
+      id: message.id,
+    })
+  ).toString('base64url');
 }
 
 // ==================== AUTHORIZATION ====================
 
-async function requireMessageAccess(workspaceId: string, userId: string, channelId: string) {
+async function requireMessageAccess(
+  workspaceId: string,
+  userId: string,
+  channelId: string
+) {
   const membership = await requireWorkspaceMember(workspaceId, userId);
   await requireChannel(workspaceId, channelId);
   return membership;
@@ -58,11 +64,15 @@ async function createMessage(
   workspaceId: string,
   userId: string,
   channelId: string,
-  input: CreateMessageInput,
+  input: CreateMessageInput
 ): Promise<PublicMessage> {
   await requireMessageAccess(workspaceId, userId, channelId);
   try {
-    const message = await messageRepository.createMessage(channelId, userId, input.content);
+    const message = await messageRepository.createMessage(
+      channelId,
+      userId,
+      input.content
+    );
     return toPublicMessage(message);
   } catch (error) {
     if (isMessageRelationMissingError(error)) {
@@ -77,13 +87,17 @@ async function listMessages(
   workspaceId: string,
   userId: string,
   channelId: string,
-  query: MessageHistoryQuery,
+  query: MessageHistoryQuery
 ): Promise<MessageHistory> {
   await requireMessageAccess(workspaceId, userId, channelId);
-  const messages = await messageRepository.listChannelMessages(channelId, query);
+  const messages = await messageRepository.listChannelMessages(
+    channelId,
+    query
+  );
   const page = messages.slice(0, query.limit);
   const oldest = page.at(-1);
-  const nextCursor = messages.length > query.limit && oldest ? encodeCursor(oldest) : null;
+  const nextCursor =
+    messages.length > query.limit && oldest ? encodeCursor(oldest) : null;
   return { items: page.reverse().map(toPublicMessage), nextCursor };
 }
 
@@ -92,14 +106,18 @@ async function updateMessage(
   userId: string,
   channelId: string,
   messageId: string,
-  input: UpdateMessageInput,
+  input: UpdateMessageInput
 ): Promise<PublicMessage> {
   await requireMessageAccess(workspaceId, userId, channelId);
   const message = await requireMessage(channelId, messageId);
   if (message.authorId !== userId) throw messageErrors.editForbidden();
 
   try {
-    const updated = await messageRepository.updateMessage(channelId, messageId, input.content);
+    const updated = await messageRepository.updateMessage(
+      channelId,
+      messageId,
+      input.content
+    );
     return toPublicMessage(updated);
   } catch (error) {
     if (isMessageNotFoundError(error)) throw messageErrors.notFound();
@@ -111,11 +129,15 @@ async function deleteMessage(
   workspaceId: string,
   userId: string,
   channelId: string,
-  messageId: string,
+  messageId: string
 ): Promise<void> {
   const membership = await requireMessageAccess(workspaceId, userId, channelId);
   const message = await requireMessage(channelId, messageId);
-  if (message.authorId !== userId && membership.role !== 'Owner' && membership.role !== 'Admin') {
+  if (
+    message.authorId !== userId &&
+    membership.role !== 'Owner' &&
+    membership.role !== 'Admin'
+  ) {
     throw messageErrors.deleteForbidden();
   }
 
@@ -129,4 +151,9 @@ async function deleteMessage(
 
 // ==================== PUBLIC API ====================
 
-export const messageService = { createMessage, listMessages, updateMessage, deleteMessage };
+export const messageService = {
+  createMessage,
+  listMessages,
+  updateMessage,
+  deleteMessage,
+};

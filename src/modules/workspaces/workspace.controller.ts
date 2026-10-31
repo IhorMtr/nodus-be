@@ -18,51 +18,106 @@ import type {
 // ==================== AUTH CONTEXT ====================
 
 function authenticatedUserId(req: Request): string {
-  if (!req.auth) throw new AppError('Access token is required', 401, 'Unauthorized');
+  if (!req.auth)
+    throw new AppError('Access token is required', 401, 'Unauthorized');
   return req.auth.userId;
 }
 
 // ==================== WORKSPACE LIFECYCLE ====================
 
-export const createWorkspace: RequestHandler<ParamsDictionary, ApiResponse<PublicWorkspace>, CreateWorkspaceInput> = async (req, res) => {
-  const workspace = await workspaceService.createWorkspace(authenticatedUserId(req), req.body);
+export const createWorkspace: RequestHandler<
+  ParamsDictionary,
+  ApiResponse<PublicWorkspace>,
+  CreateWorkspaceInput
+> = async (req, res) => {
+  const workspace = await workspaceService.createWorkspace(
+    authenticatedUserId(req),
+    req.body
+  );
   res.status(201).json(successResponse(workspace));
 };
 
-export const listWorkspaces: RequestHandler<ParamsDictionary, ApiResponse<PublicWorkspace[]>> = async (req, res) => {
-  const workspaces = await workspaceService.listWorkspaces(authenticatedUserId(req));
+export const listWorkspaces: RequestHandler<
+  ParamsDictionary,
+  ApiResponse<PublicWorkspace[]>
+> = async (req, res) => {
+  const workspaces = await workspaceService.listWorkspaces(
+    authenticatedUserId(req)
+  );
   res.json(successResponse(workspaces));
 };
 
-export const getWorkspace: RequestHandler<WorkspaceParams, ApiResponse<PublicWorkspace>> = async (req, res) => {
-  const workspace = await workspaceService.getWorkspace(req.params.workspaceId, authenticatedUserId(req));
+export const getWorkspace: RequestHandler<
+  WorkspaceParams,
+  ApiResponse<PublicWorkspace>
+> = async (req, res) => {
+  const workspace = await workspaceService.getWorkspace(
+    req.params.workspaceId,
+    authenticatedUserId(req)
+  );
   res.json(successResponse(workspace));
 };
 
-export const updateWorkspace: RequestHandler<WorkspaceParams, ApiResponse<PublicWorkspace>, UpdateWorkspaceInput> = async (req, res) => {
-  const workspace = await workspaceService.updateWorkspace(req.params.workspaceId, authenticatedUserId(req), req.body);
+export const updateWorkspace: RequestHandler<
+  WorkspaceParams,
+  ApiResponse<PublicWorkspace>,
+  UpdateWorkspaceInput
+> = async (req, res) => {
+  const workspace = await workspaceService.updateWorkspace(
+    req.params.workspaceId,
+    authenticatedUserId(req),
+    req.body
+  );
   res.json(successResponse(workspace));
 };
 
-export const deleteWorkspace: RequestHandler<WorkspaceParams, ApiResponse<null>> = async (req, res) => {
-  await workspaceService.deleteWorkspace(req.params.workspaceId, authenticatedUserId(req));
+export const deleteWorkspace: RequestHandler<
+  WorkspaceParams,
+  ApiResponse<null>
+> = async (req, res) => {
+  await workspaceService.deleteWorkspace(
+    req.params.workspaceId,
+    authenticatedUserId(req)
+  );
   res.json(successResponse(null));
 };
 
 // ==================== MEMBERSHIP ====================
 
-export const listMembers: RequestHandler<WorkspaceParams, ApiResponse<PublicWorkspaceMember[]>> = async (req, res) => {
-  const members = await workspaceService.listMembers(req.params.workspaceId, authenticatedUserId(req));
+export const listMembers: RequestHandler<
+  WorkspaceParams,
+  ApiResponse<PublicWorkspaceMember[]>
+> = async (req, res) => {
+  const members = await workspaceService.listMembers(
+    req.params.workspaceId,
+    authenticatedUserId(req)
+  );
   res.json(successResponse(members));
 };
 
-export const updateMemberRole: RequestHandler<WorkspaceMemberParams, ApiResponse<PublicWorkspaceMember>, UpdateMemberRoleInput> = async (req, res) => {
-  const member = await workspaceService.updateMemberRole(req.params.workspaceId, authenticatedUserId(req), req.params.userId, req.body);
+export const updateMemberRole: RequestHandler<
+  WorkspaceMemberParams,
+  ApiResponse<PublicWorkspaceMember>,
+  UpdateMemberRoleInput
+> = async (req, res) => {
+  const member = await workspaceService.updateMemberRole(
+    req.params.workspaceId,
+    authenticatedUserId(req),
+    req.params.userId,
+    req.body
+  );
   res.json(successResponse(member));
 };
 
-export const removeMember: RequestHandler<WorkspaceMemberParams, ApiResponse<null>> = async (req, res) => {
-  await workspaceService.removeMember(req.params.workspaceId, authenticatedUserId(req), req.params.userId);
+export const removeMember: RequestHandler<
+  WorkspaceMemberParams,
+  ApiResponse<null>
+> = async (req, res) => {
+  await workspaceService.removeMember(
+    req.params.workspaceId,
+    authenticatedUserId(req),
+    req.params.userId
+  );
   // The membership is already deleted; this only stops live delivery to the removed user.
   await revokeWorkspaceAccess(req.params.workspaceId, req.params.userId);
   res.json(successResponse(null));

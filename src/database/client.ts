@@ -16,5 +16,9 @@ export const prisma = new PrismaClient({
 });
 
 // Prisma error messages may include sensitive query arguments.
-prisma.$on('warn', (event) => logger.warn({ target: event.target }, 'Prisma warning'));
-prisma.$on('error', (event) => logger.error({ target: event.target }, 'Database query failed'));
+prisma.$on('warn', event =>
+  logger.warn({ target: event.target }, 'Prisma warning')
+);
+prisma.$on('error', event =>
+  logger.error({ target: event.target }, 'Database query failed')
+);

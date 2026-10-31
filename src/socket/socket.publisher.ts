@@ -25,36 +25,58 @@ function publish(operation: string, send: (io: SocketServer) => void): void {
 
 // ==================== MESSAGE EVENTS ====================
 
-export function publishMessageCreated(workspaceId: string, message: PublicMessage): void {
-  publish('message:created', (io) => {
+export function publishMessageCreated(
+  workspaceId: string,
+  message: PublicMessage
+): void {
+  publish('message:created', io => {
     const room = channelRoom(workspaceId, message.channelId);
-    logger.info({
-      workspaceId,
-      channelId: message.channelId,
-      messageId: message.id,
-      room,
-      roomSize: io.sockets.adapter.rooms.get(room)?.size ?? 0,
-    }, 'Publishing message:created');
+    logger.info(
+      {
+        workspaceId,
+        channelId: message.channelId,
+        messageId: message.id,
+        room,
+        roomSize: io.sockets.adapter.rooms.get(room)?.size ?? 0,
+      },
+      'Publishing message:created'
+    );
     io.to(room).emit(SOCKET_EVENTS.MESSAGE_CREATED, { workspaceId, message });
   });
 }
 
-export function publishMessageUpdated(workspaceId: string, message: PublicMessage): void {
-  publish('message:updated', (io) => {
-    io.to(channelRoom(workspaceId, message.channelId)).emit(SOCKET_EVENTS.MESSAGE_UPDATED, { workspaceId, message });
+export function publishMessageUpdated(
+  workspaceId: string,
+  message: PublicMessage
+): void {
+  publish('message:updated', io => {
+    io.to(channelRoom(workspaceId, message.channelId)).emit(
+      SOCKET_EVENTS.MESSAGE_UPDATED,
+      { workspaceId, message }
+    );
   });
 }
 
-export function publishMessageDeleted(workspaceId: string, channelId: string, messageId: string): void {
-  publish('message:deleted', (io) => {
-    io.to(channelRoom(workspaceId, channelId)).emit(SOCKET_EVENTS.MESSAGE_DELETED, { workspaceId, channelId, messageId });
+export function publishMessageDeleted(
+  workspaceId: string,
+  channelId: string,
+  messageId: string
+): void {
+  publish('message:deleted', io => {
+    io.to(channelRoom(workspaceId, channelId)).emit(
+      SOCKET_EVENTS.MESSAGE_DELETED,
+      { workspaceId, channelId, messageId }
+    );
   });
 }
 
 // ==================== ACCESS REVOCATION ====================
 
 // Drops every channel subscription of the user in the workspace across all their sockets.
-export async function revokeWorkspaceAccess(workspaceId: string, userId: string): Promise<void> {
+export async function revokeWorkspaceAccess(
+  workspaceId: string,
+  userId: string
+): Promise<void> {
   if (!socketServer) return;
 
   try {
@@ -71,6 +93,9 @@ export async function revokeWorkspaceAccess(workspaceId: string, userId: string)
     if (rooms.size > 0) userSockets.socketsLeave([...rooms]);
     userSockets.emit(SOCKET_EVENTS.WORKSPACE_ACCESS_REVOKED, { workspaceId });
   } catch (error) {
-    logger.error({ err: error, workspaceId }, 'Workspace access revocation failed');
+    logger.error(
+      { err: error, workspaceId },
+      'Workspace access revocation failed'
+    );
   }
 }

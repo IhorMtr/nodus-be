@@ -1,55 +1,59 @@
-import { Router } from "express";
-import { authenticate } from "../../middleware/auth.middleware.js";
+import { Router } from 'express';
+import { authenticate } from '../../middleware/auth.middleware.js';
 import {
   validateBody,
   validateParams,
-} from "../../middleware/validation.middleware.js";
+} from '../../middleware/validation.middleware.js';
 import {
   createChannel,
   deleteChannel,
   getChannel,
   listChannels,
   updateChannel,
-} from "./channel.controller.js";
+} from './channel.controller.js';
 import {
   channelParamsSchema,
   channelWorkspaceParamsSchema,
   createChannelSchema,
   updateChannelSchema,
-} from "./channel.schema.js";
+} from './channel.schema.js';
+
+// ==================== MIDDLEWARE ====================
 
 export const channelRouter = Router({ mergeParams: true });
 
 channelRouter.use(authenticate);
 channelRouter.use((_req, res, next) => {
-  res.setHeader("Cache-Control", "no-store");
+  res.setHeader('Cache-Control', 'no-store');
   next();
 });
 
+// ==================== ROUTES ====================
+
 channelRouter.post(
-  "/",
+  '/',
   validateParams(channelWorkspaceParamsSchema),
   validateBody(createChannelSchema),
-  createChannel,
+  createChannel
 );
 channelRouter.get(
-  "/",
+  '/',
   validateParams(channelWorkspaceParamsSchema),
-  listChannels,
+  listChannels
 );
 channelRouter.get(
-  "/:channelId",
+  '/:channelId',
   validateParams(channelParamsSchema),
-  getChannel,
+  getChannel
 );
 channelRouter.patch(
-  "/:channelId",
+  '/:channelId',
   validateParams(channelParamsSchema),
   validateBody(updateChannelSchema),
-  updateChannel,
+  updateChannel
 );
 channelRouter.delete(
-  "/:channelId",
+  '/:channelId',
   validateParams(channelParamsSchema),
-  deleteChannel,
+  deleteChannel
 );

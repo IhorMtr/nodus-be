@@ -1,9 +1,9 @@
-import { Router } from "express";
-import { authenticate } from "../../middleware/auth.middleware.js";
+import { Router } from 'express';
+import { authenticate } from '../../middleware/auth.middleware.js';
 import {
   validateBody,
   validateParams,
-} from "../../middleware/validation.middleware.js";
+} from '../../middleware/validation.middleware.js';
 import {
   createWorkspace,
   deleteWorkspace,
@@ -13,54 +13,58 @@ import {
   removeMember,
   updateMemberRole,
   updateWorkspace,
-} from "./workspace.controller.js";
+} from './workspace.controller.js';
 import {
   createWorkspaceSchema,
   updateMemberRoleSchema,
   updateWorkspaceSchema,
   workspaceMemberParamsSchema,
   workspaceParamsSchema,
-} from "./workspace.schema.js";
+} from './workspace.schema.js';
+
+// ==================== MIDDLEWARE ====================
 
 export const workspaceRouter = Router();
 
 workspaceRouter.use(authenticate);
 workspaceRouter.use((_req, res, next) => {
-  res.setHeader("Cache-Control", "no-store");
+  res.setHeader('Cache-Control', 'no-store');
   next();
 });
 
-workspaceRouter.post("/", validateBody(createWorkspaceSchema), createWorkspace);
-workspaceRouter.get("/", listWorkspaces);
+// ==================== ROUTES ====================
+
+workspaceRouter.post('/', validateBody(createWorkspaceSchema), createWorkspace);
+workspaceRouter.get('/', listWorkspaces);
 workspaceRouter.get(
-  "/:workspaceId",
+  '/:workspaceId',
   validateParams(workspaceParamsSchema),
-  getWorkspace,
+  getWorkspace
 );
 workspaceRouter.patch(
-  "/:workspaceId",
+  '/:workspaceId',
   validateParams(workspaceParamsSchema),
   validateBody(updateWorkspaceSchema),
-  updateWorkspace,
+  updateWorkspace
 );
 workspaceRouter.delete(
-  "/:workspaceId",
+  '/:workspaceId',
   validateParams(workspaceParamsSchema),
-  deleteWorkspace,
+  deleteWorkspace
 );
 workspaceRouter.get(
-  "/:workspaceId/members",
+  '/:workspaceId/members',
   validateParams(workspaceParamsSchema),
-  listMembers,
+  listMembers
 );
 workspaceRouter.patch(
-  "/:workspaceId/members/:userId/role",
+  '/:workspaceId/members/:userId/role',
   validateParams(workspaceMemberParamsSchema),
   validateBody(updateMemberRoleSchema),
-  updateMemberRole,
+  updateMemberRole
 );
 workspaceRouter.delete(
-  "/:workspaceId/members/:userId",
+  '/:workspaceId/members/:userId',
   validateParams(workspaceMemberParamsSchema),
-  removeMember,
+  removeMember
 );

@@ -34,11 +34,11 @@ export type SocketAck<T> = ApiResponse<T>;
 export type ClientToServerEvents = {
   [SOCKET_EVENTS.CHANNEL_JOIN]: (
     payload: ChannelSubscription,
-    ack: (response: SocketAck<ChannelSubscription>) => void,
+    ack: (response: SocketAck<ChannelSubscription>) => void
   ) => void;
   [SOCKET_EVENTS.CHANNEL_LEAVE]: (
     payload: ChannelSubscription,
-    ack: (response: SocketAck<ChannelSubscription>) => void,
+    ack: (response: SocketAck<ChannelSubscription>) => void
   ) => void;
 };
 
@@ -46,7 +46,9 @@ export type ServerToClientEvents = {
   [SOCKET_EVENTS.MESSAGE_CREATED]: (payload: MessagePayload) => void;
   [SOCKET_EVENTS.MESSAGE_UPDATED]: (payload: MessagePayload) => void;
   [SOCKET_EVENTS.MESSAGE_DELETED]: (payload: MessageDeletedPayload) => void;
-  [SOCKET_EVENTS.WORKSPACE_ACCESS_REVOKED]: (payload: WorkspaceAccessRevokedPayload) => void;
+  [SOCKET_EVENTS.WORKSPACE_ACCESS_REVOKED]: (
+    payload: WorkspaceAccessRevokedPayload
+  ) => void;
 };
 
 export type InterServerEvents = Record<never, never>;

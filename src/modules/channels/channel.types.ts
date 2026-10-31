@@ -6,10 +6,16 @@ import type {
   updateChannelSchema,
 } from './channel.schema.js';
 
+// ==================== REQUEST TYPES ====================
+
 export type CreateChannelInput = z.infer<typeof createChannelSchema>;
 export type UpdateChannelInput = z.infer<typeof updateChannelSchema>;
-export type ChannelWorkspaceParams = z.infer<typeof channelWorkspaceParamsSchema>;
+export type ChannelWorkspaceParams = z.infer<
+  typeof channelWorkspaceParamsSchema
+>;
 export type ChannelParams = z.infer<typeof channelParamsSchema>;
+
+// ==================== RESPONSE TYPES ====================
 
 export type PublicChannel = {
   id: string;
