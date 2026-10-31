@@ -13,6 +13,7 @@ import {
   workspaceInviteRouter,
 } from '../modules/invites/invite.routes.js';
 import { userRouter } from '../modules/users/user.routes.js';
+import { notificationRouter } from '../modules/notifications/notification.routes.js';
 import { workspaceRouter } from '../modules/workspaces/workspace.routes.js';
 import { successResponse } from '../shared/utils/api-response.js';
 import { asyncApiDocsRouter } from './async-docs.js';
@@ -29,6 +30,7 @@ router.get('/health', (_req, res) => {
 
 router.use('/auth', authRouter);
 router.use('/users', userRouter);
+router.use('/notifications', notificationRouter);
 router.use('/invites', inviteRouter);
 router.use('/workspaces/:workspaceId/invites', workspaceInviteRouter);
 router.use('/workspaces/:workspaceId/announcements', announcementRouter);

@@ -9,6 +9,8 @@ import {
 } from '../workspaces/workspace.service.js';
 import { announcementErrors } from './announcement.errors.js';
 import { announcementRepository } from './announcement.repository.js';
+import { socketPublisher } from '../../socket/socket.publisher.js';
+import { toPublicNotification } from '../notifications/notification.service.js';
 import type {
   CreateAnnouncementInput,
   PublicAnnouncement,
@@ -81,13 +83,18 @@ async function create(
   if (input.publishAt) assertFuture(input.publishAt);
   let record: AnnouncementRecord;
   try {
-    record = await announcementRepository.create(
+    const created = await announcementRepository.create(
       workspaceId,
       userId,
       input.title,
       input.content,
       input.publishAt ?? null
     );
+    record = created.record;
+    for (const notification of created.notifications)
+      socketPublisher.publishNotificationCreated(
+        toPublicNotification(notification)
+      );
   } catch (error) {
     // A concurrent workspace deletion removes the membership before the insert.
     await requireWorkspaceRole(workspaceId, userId, ['Owner', 'Admin']);
@@ -153,11 +160,15 @@ async function update(
       throw announcementErrors.notFound();
     throw announcementErrors.conflict();
   }
+  for (const notification of updated.notifications)
+    socketPublisher.publishNotificationCreated(
+      toPublicNotification(notification)
+    );
   if (changesSchedule) {
     await unschedule(id, current.scheduleVersion);
-    await schedule(updated);
+    await schedule(updated.record);
   }
-  return publicAnnouncement(updated);
+  return publicAnnouncement(updated.record);
 }
 
 async function remove(

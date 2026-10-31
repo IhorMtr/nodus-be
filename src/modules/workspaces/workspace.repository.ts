@@ -1,5 +1,6 @@
 import { prisma } from '../../database/client.js';
 import { Prisma, WorkspaceRole } from '../../generated/prisma/client.js';
+import { notificationRepository } from '../notifications/notification.repository.js';
 
 // ==================== SELECTS ====================
 
@@ -112,6 +113,22 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
     return result.count === 1;
   }
 
+  function createMemberNotification(
+    workspaceId: string,
+    userId: string,
+    type: 'WorkspaceRoleChanged' | 'WorkspaceRemoved',
+    title: string,
+    message: string
+  ) {
+    return notificationRepository.create(client, {
+      workspaceId,
+      userId,
+      type,
+      title,
+      message,
+    });
+  }
+
   return {
     createWithOwner,
     findUserWorkspaces,
@@ -122,6 +139,7 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
     findMember,
     updateMemberRole,
     removeMember,
+    createMemberNotification,
   };
 }
 

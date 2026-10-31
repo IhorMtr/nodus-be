@@ -7,4 +7,5 @@ export const SOCKET_EVENTS = {
   MESSAGE_UPDATED: 'message:updated',
   MESSAGE_DELETED: 'message:deleted',
   WORKSPACE_ACCESS_REVOKED: 'workspace:access-revoked',
+  NOTIFICATION_CREATED: 'notification:created',
 } as const;

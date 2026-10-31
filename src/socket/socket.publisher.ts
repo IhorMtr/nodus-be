@@ -1,5 +1,6 @@
 import { logger } from '../config/logger.js';
 import type { PublicMessage } from '../modules/messages/message.types.js';
+import type { PublicNotification } from '../modules/notifications/notification.types.js';
 import { SOCKET_EVENTS } from './socket-events.js';
 import { channelRoom, channelRoomPrefix, userRoom } from './socket.rooms.js';
 import type { SocketServer } from './socket.types.js';
@@ -13,6 +14,10 @@ class SocketPublisher {
 
   bind(io: SocketServer): void {
     this.#socketServer = io;
+  }
+
+  hasServer(): boolean {
+    return this.#socketServer !== undefined;
   }
 
   // Publishing happens after the database commit, so it must never fail the request.
@@ -63,6 +68,17 @@ class SocketPublisher {
       io.to(channelRoom(workspaceId, channelId)).emit(
         SOCKET_EVENTS.MESSAGE_DELETED,
         { workspaceId, channelId, messageId }
+      );
+    });
+  }
+
+  // ==================== NOTIFICATIONS ====================
+
+  publishNotificationCreated(notification: PublicNotification): void {
+    this.#publish('notification:created', io => {
+      io.to(userRoom(notification.userId)).emit(
+        SOCKET_EVENTS.NOTIFICATION_CREATED,
+        notification
       );
     });
   }

@@ -19,6 +19,10 @@ import {
 } from '../modules/invites/invite.openapi.js';
 import { userPaths, userSchemas } from '../modules/users/user.openapi.js';
 import {
+  notificationPaths,
+  notificationSchemas,
+} from '../modules/notifications/notification.openapi.js';
+import {
   workspacePaths,
   workspaceSchemas,
 } from '../modules/workspaces/workspace.openapi.js';
@@ -33,6 +37,10 @@ export const openApiDocument: OpenAPIV3.Document = {
   tags: [
     { name: 'Auth', description: 'User authentication.' },
     { name: 'Users', description: 'The authenticated current user.' },
+    {
+      name: 'Notifications',
+      description: 'Persistent notifications of the authenticated user.',
+    },
     {
       name: 'Workspaces',
       description: 'Workspaces, memberships, and basic role authorization.',
@@ -90,6 +98,7 @@ export const openApiDocument: OpenAPIV3.Document = {
       ...messageSchemas,
       ...inviteSchemas,
       ...announcementSchemas,
+      ...notificationSchemas,
     },
   },
   paths: {
@@ -141,5 +150,6 @@ export const openApiDocument: OpenAPIV3.Document = {
     ...messagePaths,
     ...invitePaths,
     ...announcementPaths,
+    ...notificationPaths,
   },
 };

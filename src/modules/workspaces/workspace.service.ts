@@ -1,4 +1,6 @@
 import type { WorkspaceRole } from '../../generated/prisma/client.js';
+import { socketPublisher } from '../../socket/socket.publisher.js';
+import { toPublicNotification } from '../notifications/notification.service.js';
 import { workspaceErrors } from './workspace.errors.js';
 import {
   isWorkspaceConflictError,
@@ -160,11 +162,18 @@ async function updateMemberRole(
   memberUserId: string,
   input: UpdateMemberRoleInput
 ): Promise<PublicWorkspaceMember> {
-  return runWorkspaceTransaction(async repository => {
-    await requireWorkspaceRole(workspaceId, userId, ['Owner'], repository);
+  const result = await runWorkspaceTransaction(async repository => {
+    const actor = await requireWorkspaceRole(
+      workspaceId,
+      userId,
+      ['Owner'],
+      repository
+    );
     const member = await repository.findMember(workspaceId, memberUserId);
     if (!member) throw workspaceErrors.memberNotFound();
     if (member.role === 'Owner') throw workspaceErrors.ownerProtected();
+    if (member.role === input.role)
+      return { member: toPublicMember(member), notification: null };
 
     const updated = await repository.updateMemberRole(
       workspaceId,
@@ -173,8 +182,23 @@ async function updateMemberRole(
       input.role
     );
     if (!updated) throw workspaceErrors.conflict();
-    return toPublicMember({ ...member, role: input.role });
+    const notification = await repository.createMemberNotification(
+      workspaceId,
+      memberUserId,
+      'WorkspaceRoleChanged',
+      'Workspace role changed',
+      `Your role in ${actor.workspace.name} is now ${input.role}`
+    );
+    return {
+      member: toPublicMember({ ...member, role: input.role }),
+      notification,
+    };
   });
+  if (result.notification)
+    socketPublisher.publishNotificationCreated(
+      toPublicNotification(result.notification)
+    );
+  return result.member;
 }
 
 async function removeMember(
@@ -182,7 +206,7 @@ async function removeMember(
   userId: string,
   memberUserId: string
 ): Promise<void> {
-  return runWorkspaceTransaction(async repository => {
+  const notification = await runWorkspaceTransaction(async repository => {
     const actor = await requireWorkspaceRole(
       workspaceId,
       userId,
@@ -203,7 +227,17 @@ async function removeMember(
       member.role
     );
     if (!removed) throw workspaceErrors.conflict();
+    return repository.createMemberNotification(
+      workspaceId,
+      memberUserId,
+      'WorkspaceRemoved',
+      'Removed from workspace',
+      `You were removed from ${actor.workspace.name}`
+    );
   });
+  socketPublisher.publishNotificationCreated(
+    toPublicNotification(notification)
+  );
 }
 
 // ==================== PUBLIC API ====================

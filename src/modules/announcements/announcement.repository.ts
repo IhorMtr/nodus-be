@@ -1,5 +1,6 @@
 import { prisma } from '../../database/client.js';
 import { Prisma } from '../../generated/prisma/client.js';
+import { notificationRepository } from '../notifications/notification.repository.js';
 
 // ==================== SELECTS ====================
 
@@ -25,16 +26,22 @@ function create(
   content: string,
   publishAt: Date | null
 ) {
-  return prisma.announcement.create({
-    data: {
-      workspaceId,
-      authorId,
-      title,
-      content,
-      publishAt,
-      publishedAt: publishAt ? null : new Date(),
-    },
-    select,
+  return prisma.$transaction(async transaction => {
+    const record = await transaction.announcement.create({
+      data: {
+        workspaceId,
+        authorId,
+        title,
+        content,
+        publishAt,
+        publishedAt: publishAt ? null : new Date(),
+      },
+      select,
+    });
+    const notifications = publishAt
+      ? []
+      : await notificationRepository.createForAnnouncement(transaction, record);
+    return { record, notifications };
   });
 }
 
@@ -59,17 +66,30 @@ async function update(
   expectedVersion: number,
   data: Prisma.AnnouncementUpdateManyMutationInput
 ) {
-  const result = await prisma.announcement.updateMany({
-    where: {
-      workspaceId,
-      id,
-      scheduleVersion: expectedVersion,
-      ...(data.scheduleVersion ? { publishedAt: null } : {}),
-    },
-    data,
+  return prisma.$transaction(async transaction => {
+    const result = await transaction.announcement.updateMany({
+      where: {
+        workspaceId,
+        id,
+        scheduleVersion: expectedVersion,
+        ...(data.scheduleVersion ? { publishedAt: null } : {}),
+      },
+      data,
+    });
+    if (result.count !== 1) return null;
+    const record = await transaction.announcement.findFirstOrThrow({
+      where: { workspaceId, id },
+      select,
+    });
+    const notifications =
+      data.scheduleVersion && record.publishedAt
+        ? await notificationRepository.createForAnnouncement(
+            transaction,
+            record
+          )
+        : [];
+    return { record, notifications };
   });
-  if (result.count !== 1) return null;
-  return find(workspaceId, id);
 }
 
 async function remove(workspaceId: string, id: string) {
@@ -87,19 +107,23 @@ function pending() {
 }
 
 async function publish(id: string, version: number) {
-  return (
-    (
-      await prisma.announcement.updateMany({
-        where: {
-          id,
-          scheduleVersion: version,
-          publishedAt: null,
-          publishAt: { lte: new Date() },
-        },
-        data: { publishedAt: new Date() },
-      })
-    ).count === 1
-  );
+  return prisma.$transaction(async transaction => {
+    const result = await transaction.announcement.updateMany({
+      where: {
+        id,
+        scheduleVersion: version,
+        publishedAt: null,
+        publishAt: { lte: new Date() },
+      },
+      data: { publishedAt: new Date() },
+    });
+    if (result.count !== 1) return null;
+    const record = await transaction.announcement.findUniqueOrThrow({
+      where: { id },
+      select,
+    });
+    return notificationRepository.createForAnnouncement(transaction, record);
+  });
 }
 
 // ==================== PUBLIC API ====================

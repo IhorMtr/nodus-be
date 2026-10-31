@@ -50,7 +50,7 @@ const uuid = (description: string) => ({
 // ==================== DESCRIPTIONS ====================
 
 const infoDescription = `
-Socket.IO event contract of the Nodus backend. It covers **realtime delivery** of committed message changes only. The REST API stays the only way to create, edit and delete messages and to read message history ([OpenAPI document](https://${PRODUCTION_HOST}/api/openapi.json); interactive docs at \`/api/docs\` when the backend runs in development).
+Socket.IO event contract of the Nodus backend. It covers **realtime delivery** of committed message changes, notifications, and workspace access revocation. The REST API provides message history and persistent notifications ([OpenAPI document](https://${PRODUCTION_HOST}/api/openapi.json); interactive docs at \`/api/docs\` when the backend runs in development).
 
 ### How to read this document
 
@@ -263,6 +263,14 @@ export const asyncApiDocument = {
       },
       'x-socketio-room': { name: USER_ROOM, effect: 'emit' },
     },
+    notificationCreated: {
+      address: sent(SOCKET_EVENTS.NOTIFICATION_CREATED),
+      title: 'A notification was created',
+      summary:
+        'A persistent notification was committed for the authenticated user.',
+      messages: { NotificationCreated: messageRef('NotificationCreated') },
+      'x-socketio-room': { name: USER_ROOM, effect: 'emit' },
+    },
   },
   operations: {
     joinChannel: {
@@ -321,6 +329,17 @@ export const asyncApiDocument = {
       description: workspaceAccessRevokedDescription,
       messages: [
         channelMessageRef('workspaceAccessRevoked', 'WorkspaceAccessRevoked'),
+      ],
+    },
+    publishNotificationCreated: {
+      action: 'send',
+      channel: channelRef('notificationCreated'),
+      title: 'Publish a notification',
+      summary: 'Send notification:created to all sockets of the recipient.',
+      description:
+        'Sent after the notification and its source action commit to PostgreSQL. A standalone BullMQ worker forwards committed notifications through Redis pub/sub to API processes. Delivery is best effort; clients should fetch GET /notifications after reconnecting and deduplicate by id.',
+      messages: [
+        channelMessageRef('notificationCreated', 'NotificationCreated'),
       ],
     },
   },
@@ -441,6 +460,13 @@ export const asyncApiDocument = {
             payload: { workspaceId: EXAMPLE_IDS.workspace },
           },
         ],
+      },
+      NotificationCreated: {
+        name: SOCKET_EVENTS.NOTIFICATION_CREATED,
+        title: 'notification:created',
+        summary: 'A new persistent notification for this user.',
+        contentType: 'application/json',
+        payload: schemaRef('PublicNotification'),
       },
     },
     schemas: {
@@ -564,6 +590,41 @@ export const asyncApiDocument = {
         additionalProperties: false,
         properties: {
           workspaceId: uuid('Workspace the user was removed from.'),
+        },
+      },
+      PublicNotification: {
+        type: 'object',
+        required: [
+          'id',
+          'userId',
+          'workspaceId',
+          'type',
+          'entityId',
+          'title',
+          'message',
+          'readAt',
+          'createdAt',
+        ],
+        additionalProperties: false,
+        properties: {
+          id: uuid('Notification id.'),
+          userId: uuid('Recipient id.'),
+          workspaceId: uuid('Workspace id, retained after removal.'),
+          type: {
+            type: 'string',
+            enum: [
+              'AnnouncementPublished',
+              'WorkspaceRoleChanged',
+              'WorkspaceRemoved',
+            ],
+          },
+          entityId: {
+            oneOf: [uuid('Announcement id when applicable.'), { type: 'null' }],
+          },
+          title: { type: 'string' },
+          message: { type: 'string' },
+          readAt: { type: 'null' },
+          createdAt: { type: 'string', format: 'date-time' },
         },
       },
     },

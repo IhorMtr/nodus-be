@@ -6,6 +6,7 @@ import { prisma } from './database/client.js';
 import { announcementQueue } from './queues/announcement.queue.js';
 import { closeRedis, redis } from './redis/client.js';
 import { initializeSocket } from './socket/index.js';
+import { notificationBridge } from './socket/notification.bridge.js';
 import { announcementWorker } from './workers/announcements.lifecycle.js';
 
 // ==================== SERVER ====================
@@ -54,6 +55,7 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
   const infrastructure = await Promise.allSettled([
     prisma.$disconnect(),
     closeRedis(),
+    notificationBridge.close(),
   ]);
   for (const result of infrastructure) {
     if (result.status === 'rejected') {
@@ -86,6 +88,11 @@ httpServer.on('error', error => {
 
 async function bootstrap(): Promise<void> {
   await Promise.all([prisma.$connect(), announcementQueue.waitUntilReady()]);
+  try {
+    await notificationBridge.start();
+  } catch (error) {
+    logger.error({ err: error }, 'Notification subscription unavailable');
+  }
   if (shuttingDown) return;
 
   httpServer.listen(env.PORT, () => {

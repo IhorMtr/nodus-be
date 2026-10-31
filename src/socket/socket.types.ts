@@ -1,6 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 
 import type { PublicMessage } from '../modules/messages/message.types.js';
+import type { PublicNotification } from '../modules/notifications/notification.types.js';
 import type { ApiResponse } from '../shared/types/api-response.js';
 import type { SOCKET_EVENTS } from './socket-events.js';
 
@@ -49,6 +50,7 @@ export type ServerToClientEvents = {
   [SOCKET_EVENTS.WORKSPACE_ACCESS_REVOKED]: (
     payload: WorkspaceAccessRevokedPayload
   ) => void;
+  [SOCKET_EVENTS.NOTIFICATION_CREATED]: (payload: PublicNotification) => void;
 };
 
 export type InterServerEvents = Record<never, never>;

@@ -12,6 +12,7 @@ import { announcementWorker } from '../../src/workers/announcements.lifecycle.js
 // ==================== FIXTURES ====================
 
 let userId: string;
+let memberId: string;
 let workspaceId: string;
 
 // ==================== SETUP AND CLEANUP ====================
@@ -32,10 +33,24 @@ beforeAll(async () => {
     },
   });
   userId = user.id;
+  const member = await prisma.user.create({
+    data: {
+      firstName: 'Member',
+      lastName: 'Test',
+      email: `worker-member-${randomUUID()}@example.test`,
+      passwordHash: 'worker-test',
+    },
+  });
+  memberId = member.id;
   const workspace = await prisma.workspace.create({
     data: {
       name: 'Worker lifecycle test',
-      members: { create: { userId, role: 'Owner' } },
+      members: {
+        create: [
+          { userId, role: 'Owner' },
+          { userId: memberId, role: 'Member' },
+        ],
+      },
     },
   });
   workspaceId = workspace.id;
@@ -46,6 +61,7 @@ afterAll(async () => {
   if (workspaceId)
     await prisma.workspace.delete({ where: { id: workspaceId } });
   if (userId) await prisma.user.delete({ where: { id: userId } });
+  if (memberId) await prisma.user.delete({ where: { id: memberId } });
   await announcementQueue.close();
   await closeRedis();
   await prisma.$disconnect();
@@ -85,6 +101,11 @@ describe('announcement worker lifecycle', () => {
       await delay(200);
     }
     expect(published).toBe(true);
+    expect(
+      await prisma.notification.count({
+        where: { userId: memberId, entityId: announcement.id },
+      })
+    ).toBe(1);
 
     await Promise.all([announcementWorker.close(), announcementWorker.close()]);
     expect((await announcementQueue.getWorkers()).length).toBe(workersBefore);
