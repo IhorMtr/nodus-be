@@ -23,7 +23,7 @@ const cursorPayloadSchema = z.strictObject({
   id: z.uuid().transform(value => value.toLowerCase()),
 });
 
-const cursorSchema = z
+export const cursorSchema = z
   .string()
   .min(1)
   .max(256)

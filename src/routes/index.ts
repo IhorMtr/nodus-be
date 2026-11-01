@@ -8,6 +8,7 @@ import { authRouter } from '../modules/auth/auth.routes.js';
 import { announcementRouter } from '../modules/announcements/announcement.routes.js';
 import { channelRouter } from '../modules/channels/channel.routes.js';
 import { messageRouter } from '../modules/messages/message.routes.js';
+import { searchRouter } from '../modules/search/search.routes.js';
 import {
   inviteRouter,
   workspaceInviteRouter,
@@ -34,6 +35,7 @@ router.use('/notifications', notificationRouter);
 router.use('/invites', inviteRouter);
 router.use('/workspaces/:workspaceId/invites', workspaceInviteRouter);
 router.use('/workspaces/:workspaceId/announcements', announcementRouter);
+router.use('/workspaces/:workspaceId/search', searchRouter);
 router.use(
   '/workspaces/:workspaceId/channels/:channelId/messages',
   messageRouter

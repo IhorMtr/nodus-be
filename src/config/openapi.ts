@@ -19,6 +19,10 @@ import {
 } from '../modules/invites/invite.openapi.js';
 import { userPaths, userSchemas } from '../modules/users/user.openapi.js';
 import {
+  searchPaths,
+  searchSchemas,
+} from '../modules/search/search.openapi.js';
+import {
   notificationPaths,
   notificationSchemas,
 } from '../modules/notifications/notification.openapi.js';
@@ -26,6 +30,8 @@ import {
   workspacePaths,
   workspaceSchemas,
 } from '../modules/workspaces/workspace.openapi.js';
+
+// ==================== PUBLIC API ====================
 
 export const openApiDocument: OpenAPIV3.Document = {
   openapi: '3.0.3',
@@ -96,6 +102,7 @@ export const openApiDocument: OpenAPIV3.Document = {
       ...workspaceSchemas,
       ...channelSchemas,
       ...messageSchemas,
+      ...searchSchemas,
       ...inviteSchemas,
       ...announcementSchemas,
       ...notificationSchemas,
@@ -148,6 +155,7 @@ export const openApiDocument: OpenAPIV3.Document = {
     ...workspacePaths,
     ...channelPaths,
     ...messagePaths,
+    ...searchPaths,
     ...invitePaths,
     ...announcementPaths,
     ...notificationPaths,

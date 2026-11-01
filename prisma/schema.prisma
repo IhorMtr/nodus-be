@@ -116,6 +116,7 @@ model Message {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
   channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  // A GIN trigram index in add_message_search_index supports case-insensitive substring search.
 
   @@index([channelId, createdAt(sort: Desc), id(sort: Desc)])
 }
