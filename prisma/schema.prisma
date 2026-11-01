@@ -11,19 +11,26 @@ datasource db {
 }
 
 model User {
-  id                      String            @id @default(uuid()) @db.Uuid
-  firstName               String            @db.VarChar(100)
-  lastName                String            @db.VarChar(100)
-  email                   String            @unique @db.VarChar(254)
-  passwordHash            String            @db.VarChar(255)
-  createdAt               DateTime          @default(now()) @db.Timestamptz(3)
-  updatedAt               DateTime          @updatedAt @db.Timestamptz(3)
+  id                      String             @id @default(uuid()) @db.Uuid
+  firstName               String             @db.VarChar(100)
+  lastName                String             @db.VarChar(100)
+  email                   String             @unique @db.VarChar(254)
+  passwordHash            String             @db.VarChar(255)
+  createdAt               DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime           @updatedAt @db.Timestamptz(3)
+  presencePreference      PresencePreference @default(Online)
   authSessions            AuthSession[]
   workspaceMemberships    WorkspaceMember[]
   createdWorkspaceInvites WorkspaceInvite[]
   messages                Message[]
   announcements           Announcement[]
   notifications           Notification[]
+}
+
+enum PresencePreference {
+  Online
+  Away
+  Dnd
 }
 
 enum WorkspaceRole {
@@ -86,15 +93,17 @@ model Announcement {
 }
 
 model Channel {
-  id          String    @id @default(uuid()) @db.Uuid
-  workspaceId String    @db.Uuid
-  name        String    @db.VarChar(80)
-  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id          String             @id @default(uuid()) @db.Uuid
+  workspaceId String             @db.Uuid
+  name        String             @db.VarChar(80)
+  createdAt   DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime           @updatedAt @db.Timestamptz(3)
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   messages    Message[]
+  readStates  ChannelReadState[]
   // An expression unique index in add_channels enforces workspaceId + lower(name).
 
+  @@unique([id, workspaceId])
   @@index([workspaceId, createdAt, id])
 }
 
@@ -111,14 +120,31 @@ model Message {
   @@index([channelId, createdAt(sort: Desc), id(sort: Desc)])
 }
 
+model ChannelReadState {
+  userId            String          @db.Uuid
+  workspaceId       String          @db.Uuid
+  channelId         String          @db.Uuid
+  lastReadMessageId String          @db.Uuid
+  // The message ID is a durable cursor tie-breaker, not a foreign key; deleted messages must not reset read progress.
+  lastReadCreatedAt DateTime        @db.Timestamptz(3)
+  lastReadAt        DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
+  member            WorkspaceMember @relation(fields: [workspaceId, userId], references: [workspaceId, userId], onDelete: Cascade)
+  channel           Channel         @relation(fields: [channelId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@id([userId, channelId])
+  @@index([channelId, userId])
+}
+
 model WorkspaceMember {
-  workspaceId String        @db.Uuid
-  userId      String        @db.Uuid
-  role        WorkspaceRole @default(Member)
-  createdAt   DateTime      @default(now()) @db.Timestamptz(3)
-  updatedAt   DateTime      @updatedAt @db.Timestamptz(3)
-  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user        User          @relation(fields: [userId], references: [id], onDelete: Restrict)
+  workspaceId       String             @db.Uuid
+  userId            String             @db.Uuid
+  role              WorkspaceRole      @default(Member)
+  createdAt         DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime           @updatedAt @db.Timestamptz(3)
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
+  channelReadStates ChannelReadState[]
   // A partial unique index in add_workspaces enforces at most one Owner per workspace.
 
   @@id([workspaceId, userId])

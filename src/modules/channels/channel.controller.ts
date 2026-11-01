@@ -3,11 +3,15 @@ import { AppError } from '../../shared/errors/app-error.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
 import { channelService } from './channel.service.js';
+import { channelReadStateService } from './channel-read-state.service.js';
 import type {
   ChannelParams,
   ChannelWorkspaceParams,
   CreateChannelInput,
+  MarkChannelReadInput,
   PublicChannel,
+  PublicChannelReadState,
+  PublicChannelWithUnread,
   UpdateChannelInput,
 } from './channel.types.js';
 
@@ -36,7 +40,7 @@ export const createChannel: RequestHandler<
 
 export const listChannels: RequestHandler<
   ChannelWorkspaceParams,
-  ApiResponse<PublicChannel[]>
+  ApiResponse<PublicChannelWithUnread[]>
 > = async (req, res) => {
   const channels = await channelService.listChannels(
     req.params.workspaceId,
@@ -47,7 +51,7 @@ export const listChannels: RequestHandler<
 
 export const getChannel: RequestHandler<
   ChannelParams,
-  ApiResponse<PublicChannel>
+  ApiResponse<PublicChannelWithUnread>
 > = async (req, res) => {
   const channel = await channelService.getChannel(
     req.params.workspaceId,
@@ -81,4 +85,20 @@ export const deleteChannel: RequestHandler<
     req.params.channelId
   );
   res.json(successResponse(null));
+};
+
+// ==================== READ STATE ====================
+
+export const markChannelRead: RequestHandler<
+  ChannelParams,
+  ApiResponse<PublicChannelReadState>,
+  MarkChannelReadInput
+> = async (req, res) => {
+  const state = await channelReadStateService.markRead(
+    req.params.workspaceId,
+    authenticatedUserId(req),
+    req.params.channelId,
+    req.body.lastReadMessageId
+  );
+  res.json(successResponse(state));
 };

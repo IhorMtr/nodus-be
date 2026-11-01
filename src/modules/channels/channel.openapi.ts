@@ -117,6 +117,43 @@ export const channelSchemas: Record<string, OpenAPIV3.SchemaObject> = {
       updatedAt: { type: 'string', format: 'date-time' },
     },
   },
+  ChannelWithUnread: {
+    type: 'object',
+    required: [
+      'id',
+      'workspaceId',
+      'name',
+      'createdAt',
+      'updatedAt',
+      'unreadCount',
+      'hasUnread',
+    ],
+    additionalProperties: false,
+    properties: {
+      id: { type: 'string', format: 'uuid' },
+      workspaceId: { type: 'string', format: 'uuid' },
+      name: channelName,
+      createdAt: { type: 'string', format: 'date-time' },
+      updatedAt: { type: 'string', format: 'date-time' },
+      unreadCount: { type: 'integer', minimum: 0 },
+      hasUnread: { type: 'boolean' },
+    },
+  },
+  MarkChannelReadRequest: {
+    type: 'object',
+    required: ['lastReadMessageId'],
+    additionalProperties: false,
+    properties: { lastReadMessageId: { type: 'string', format: 'uuid' } },
+  },
+  ChannelReadState: {
+    type: 'object',
+    required: ['lastReadMessageId', 'lastReadAt'],
+    additionalProperties: false,
+    properties: {
+      lastReadMessageId: { type: 'string', format: 'uuid' },
+      lastReadAt: { type: 'string', format: 'date-time' },
+    },
+  },
   CreateChannelRequest: {
     type: 'object',
     required: ['name'],
@@ -130,9 +167,11 @@ export const channelSchemas: Record<string, OpenAPIV3.SchemaObject> = {
     properties: { name: { ...channelName, example: 'Backend' } },
   },
   ChannelResponse: successEnvelope(schemaRef('Channel')),
+  ChannelWithUnreadResponse: successEnvelope(schemaRef('ChannelWithUnread')),
+  ChannelReadStateResponse: successEnvelope(schemaRef('ChannelReadState')),
   ChannelListResponse: successEnvelope({
     type: 'array',
-    items: schemaRef('Channel'),
+    items: schemaRef('ChannelWithUnread'),
   }),
   ChannelDeleteResponse: successEnvelope({
     type: 'object',
@@ -226,7 +265,7 @@ export const channelPaths: OpenAPIV3.PathsObject = {
       operationId: 'listChannels',
       summary: 'List workspace channels',
       description:
-        'Available to Owner, Admin, and Member. Returns only channels belonging to this workspace, ordered by createdAt ascending, then id ascending. Returns an empty array when the workspace has no channels.',
+        'Available to Owner, Admin, and Member. Returns only channels belonging to this workspace, ordered by createdAt ascending, then id ascending. Each channel includes the authenticated user’s unreadCount and hasUnread. Before the first read mark, every existing message is unread; deleted messages are excluded. Returns an empty array when the workspace has no channels.',
       responses: {
         ...authenticatedResponses,
         '200': successResponse('Workspace channels.', 'ChannelListResponse'),
@@ -245,7 +284,10 @@ export const channelPaths: OpenAPIV3.PathsObject = {
         'Available to Owner, Admin, and Member. A channel must belong to the workspace specified in the URL; a channel from another workspace returns ChannelNotFound.',
       responses: {
         ...authenticatedResponses,
-        '200': successResponse('Channel details.', 'ChannelResponse'),
+        '200': successResponse(
+          'Channel details and unread status.',
+          'ChannelWithUnreadResponse'
+        ),
         '400': validationResponse(invalidChannelParams),
         '404': channelNotFound,
       },
@@ -281,6 +323,32 @@ export const channelPaths: OpenAPIV3.PathsObject = {
         '400': validationResponse(invalidChannelParams),
         '403': insufficientRole,
         '404': channelNotFound,
+      },
+    },
+  },
+  '/workspaces/{workspaceId}/channels/{channelId}/read-state': {
+    parameters: [workspaceIdParameter, channelIdParameter],
+    put: {
+      ...protectedOperation,
+      operationId: 'markChannelRead',
+      summary: 'Mark a channel read through a message',
+      description:
+        'Available to workspace members for their own read state. The message must belong to the channel in the URL. The stored boundary advances in message history order (createdAt, id); older or repeated marks return the current state without moving it backwards. A deleted boundary message does not reset the position. No state exists for an empty channel until a message is marked read.',
+      requestBody: requestBody('MarkChannelReadRequest'),
+      responses: {
+        ...authenticatedResponses,
+        '200': successResponse(
+          'Current channel read state.',
+          'ChannelReadStateResponse'
+        ),
+        '400': validationResponse(
+          { ...invalidChannelParams, lastReadMessageId: ['Invalid UUID'] },
+          true
+        ),
+        '404': errorResponse(
+          'An unavailable workspace returns WorkspaceNotFound; a channel outside it returns ChannelNotFound; an unknown message or one from another channel returns MessageNotFound.',
+          ['WorkspaceNotFound', 'ChannelNotFound', 'MessageNotFound']
+        ),
       },
     },
   },

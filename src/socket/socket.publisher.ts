@@ -1,6 +1,7 @@
 import { logger } from '../config/logger.js';
 import type { PublicMessage } from '../modules/messages/message.types.js';
 import type { PublicNotification } from '../modules/notifications/notification.types.js';
+import type { PresenceUpdate } from '../modules/presence/presence.service.js';
 import { SOCKET_EVENTS } from './socket-events.js';
 import { channelRoom, channelRoomPrefix, userRoom } from './socket.rooms.js';
 import type { SocketServer } from './socket.types.js';
@@ -79,6 +80,18 @@ class SocketPublisher {
       io.to(userRoom(notification.userId)).emit(
         SOCKET_EVENTS.NOTIFICATION_CREATED,
         notification
+      );
+    });
+  }
+
+  // ==================== PRESENCE ====================
+
+  publishPresenceUpdated(update: PresenceUpdate, recipientIds: string[]): void {
+    if (recipientIds.length === 0) return;
+    this.#publish('presence:updated', io => {
+      io.to(recipientIds.map(userRoom)).emit(
+        SOCKET_EVENTS.PRESENCE_UPDATED,
+        update
       );
     });
   }

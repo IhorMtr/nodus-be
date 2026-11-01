@@ -9,12 +9,14 @@ import {
   deleteChannel,
   getChannel,
   listChannels,
+  markChannelRead,
   updateChannel,
 } from './channel.controller.js';
 import {
   channelParamsSchema,
   channelWorkspaceParamsSchema,
   createChannelSchema,
+  markChannelReadSchema,
   updateChannelSchema,
 } from './channel.schema.js';
 
@@ -40,6 +42,12 @@ channelRouter.get(
   '/',
   validateParams(channelWorkspaceParamsSchema),
   listChannels
+);
+channelRouter.put(
+  '/:channelId/read-state',
+  validateParams(channelParamsSchema),
+  validateBody(markChannelReadSchema),
+  markChannelRead
 );
 channelRouter.get(
   '/:channelId',

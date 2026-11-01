@@ -13,6 +13,9 @@ const uuidSchema = z.uuid().transform(value => value.toLowerCase());
 
 export const createChannelSchema = z.strictObject({ name: nameSchema });
 export const updateChannelSchema = z.strictObject({ name: nameSchema });
+export const markChannelReadSchema = z.strictObject({
+  lastReadMessageId: uuidSchema,
+});
 export const channelWorkspaceParamsSchema = z.strictObject({
   workspaceId: uuidSchema,
 });

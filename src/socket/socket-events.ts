@@ -1,3 +1,5 @@
+// ==================== EVENT NAMES ====================
+
 export const SOCKET_EVENTS = {
   CONNECTION: 'connection',
   DISCONNECT: 'disconnect',
@@ -8,4 +10,5 @@ export const SOCKET_EVENTS = {
   MESSAGE_DELETED: 'message:deleted',
   WORKSPACE_ACCESS_REVOKED: 'workspace:access-revoked',
   NOTIFICATION_CREATED: 'notification:created',
+  PRESENCE_UPDATED: 'presence:updated',
 } as const;

@@ -50,7 +50,7 @@ const uuid = (description: string) => ({
 // ==================== DESCRIPTIONS ====================
 
 const infoDescription = `
-Socket.IO event contract of the Nodus backend. It covers **realtime delivery** of committed message changes, notifications, and workspace access revocation. The REST API provides message history and persistent notifications ([OpenAPI document](https://${PRODUCTION_HOST}/api/openapi.json); interactive docs at \`/api/docs\` when the backend runs in development).
+Socket.IO event contract of the Nodus backend. It covers **realtime delivery** of committed message changes, notifications, presence, and workspace access revocation. The REST API provides message history and persistent notifications ([OpenAPI document](https://${PRODUCTION_HOST}/api/openapi.json); interactive docs at \`/api/docs\` when the backend runs in development).
 
 ### How to read this document
 
@@ -271,6 +271,13 @@ export const asyncApiDocument = {
       messages: { NotificationCreated: messageRef('NotificationCreated') },
       'x-socketio-room': { name: USER_ROOM, effect: 'emit' },
     },
+    presenceUpdated: {
+      address: sent(SOCKET_EVENTS.PRESENCE_UPDATED),
+      title: 'A user’s effective presence changed',
+      summary: 'Status of a user sharing a workspace with the recipient.',
+      messages: { PresenceUpdated: messageRef('PresenceUpdated') },
+      'x-socketio-room': { name: USER_ROOM, effect: 'emit' },
+    },
   },
   operations: {
     joinChannel: {
@@ -341,6 +348,16 @@ export const asyncApiDocument = {
       messages: [
         channelMessageRef('notificationCreated', 'NotificationCreated'),
       ],
+    },
+    publishPresenceUpdated: {
+      action: 'send',
+      channel: channelRef('presenceUpdated'),
+      title: 'Publish a presence update',
+      summary:
+        'Send presence:updated to users who share a workspace with the subject.',
+      description:
+        'Emitted on the first Socket.IO connection, after the last connection has been absent for a short grace period, and when a connected user changes their saved status. Multiple sockets of one user count as one presence. Delivery is best effort across API processes through Redis pub/sub. After reconnect, fetch workspace members for the current status.',
+      messages: [channelMessageRef('presenceUpdated', 'PresenceUpdated')],
     },
   },
   components: {
@@ -468,8 +485,33 @@ export const asyncApiDocument = {
         contentType: 'application/json',
         payload: schemaRef('PublicNotification'),
       },
+      PresenceUpdated: {
+        name: SOCKET_EVENTS.PRESENCE_UPDATED,
+        title: 'presence:updated',
+        summary: 'Effective status changed for a user in a shared workspace.',
+        contentType: 'application/json',
+        payload: schemaRef('PresenceUpdate'),
+        examples: [
+          {
+            name: 'Online',
+            payload: { userId: EXAMPLE_IDS.user, status: 'online' },
+          },
+        ],
+      },
     },
     schemas: {
+      PresenceUpdate: {
+        type: 'object',
+        required: ['userId', 'status'],
+        additionalProperties: false,
+        properties: {
+          userId: uuid('User whose status changed.'),
+          status: {
+            type: 'string',
+            enum: ['online', 'away', 'dnd', 'offline'],
+          },
+        },
+      },
       ChannelSubscription: {
         type: 'object',
         description:

@@ -1,5 +1,9 @@
 import type { WorkspaceRole } from '../../generated/prisma/client.js';
 import { socketPublisher } from '../../socket/socket.publisher.js';
+import {
+  presenceService,
+  type PresenceStatus,
+} from '../presence/presence.service.js';
 import { toPublicNotification } from '../notifications/notification.service.js';
 import { workspaceErrors } from './workspace.errors.js';
 import {
@@ -38,7 +42,10 @@ function toPublicWorkspace(
   };
 }
 
-function toPublicMember(member: MemberRecord): PublicWorkspaceMember {
+function toPublicMember(
+  member: MemberRecord,
+  status: PresenceStatus
+): PublicWorkspaceMember {
   return {
     userId: member.userId,
     firstName: member.user.firstName,
@@ -46,6 +53,7 @@ function toPublicMember(member: MemberRecord): PublicWorkspaceMember {
     email: member.user.email,
     role: member.role,
     joinedAt: member.createdAt.toISOString(),
+    status,
   };
 }
 
@@ -149,11 +157,16 @@ async function listMembers(
   workspaceId: string,
   userId: string
 ): Promise<PublicWorkspaceMember[]> {
-  return runWorkspaceTransaction(async repository => {
+  const members = await runWorkspaceTransaction(async repository => {
     await requireWorkspaceMember(workspaceId, userId, repository);
-    const members = await repository.listMembers(workspaceId);
-    return members.map(toPublicMember);
+    return repository.listMembers(workspaceId);
   });
+  const statuses = await presenceService.getMany(
+    members.map(member => member.userId)
+  );
+  return members.map(member =>
+    toPublicMember(member, statuses.get(member.userId) ?? 'offline')
+  );
 }
 
 async function updateMemberRole(
@@ -172,8 +185,7 @@ async function updateMemberRole(
     const member = await repository.findMember(workspaceId, memberUserId);
     if (!member) throw workspaceErrors.memberNotFound();
     if (member.role === 'Owner') throw workspaceErrors.ownerProtected();
-    if (member.role === input.role)
-      return { member: toPublicMember(member), notification: null };
+    if (member.role === input.role) return { member, notification: null };
 
     const updated = await repository.updateMemberRole(
       workspaceId,
@@ -190,7 +202,7 @@ async function updateMemberRole(
       `Your role in ${actor.workspace.name} is now ${input.role}`
     );
     return {
-      member: toPublicMember({ ...member, role: input.role }),
+      member: { ...member, role: input.role },
       notification,
     };
   });
@@ -198,7 +210,8 @@ async function updateMemberRole(
     socketPublisher.publishNotificationCreated(
       toPublicNotification(result.notification)
     );
-  return result.member;
+  const presence = await presenceService.get(result.member.userId);
+  return toPublicMember(result.member, presence.status);
 }
 
 async function removeMember(

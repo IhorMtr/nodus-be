@@ -2,6 +2,7 @@ import type { Server, Socket } from 'socket.io';
 
 import type { PublicMessage } from '../modules/messages/message.types.js';
 import type { PublicNotification } from '../modules/notifications/notification.types.js';
+import type { PresenceUpdate } from '../modules/presence/presence.service.js';
 import type { ApiResponse } from '../shared/types/api-response.js';
 import type { SOCKET_EVENTS } from './socket-events.js';
 
@@ -51,6 +52,7 @@ export type ServerToClientEvents = {
     payload: WorkspaceAccessRevokedPayload
   ) => void;
   [SOCKET_EVENTS.NOTIFICATION_CREATED]: (payload: PublicNotification) => void;
+  [SOCKET_EVENTS.PRESENCE_UPDATED]: (payload: PresenceUpdate) => void;
 };
 
 export type InterServerEvents = Record<never, never>;

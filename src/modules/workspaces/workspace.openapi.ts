@@ -127,7 +127,15 @@ export const workspaceSchemas: Record<string, OpenAPIV3.SchemaObject> = {
   },
   WorkspaceMember: {
     type: 'object',
-    required: ['userId', 'firstName', 'lastName', 'email', 'role', 'joinedAt'],
+    required: [
+      'userId',
+      'firstName',
+      'lastName',
+      'email',
+      'role',
+      'joinedAt',
+      'status',
+    ],
     additionalProperties: false,
     properties: {
       userId: { type: 'string', format: 'uuid' },
@@ -136,6 +144,7 @@ export const workspaceSchemas: Record<string, OpenAPIV3.SchemaObject> = {
       email: { type: 'string', format: 'email', example: 'john@example.com' },
       role,
       joinedAt: { type: 'string', format: 'date-time' },
+      status: { $ref: '#/components/schemas/PresenceStatus' },
     },
   },
   CreateWorkspaceRequest: {
@@ -328,7 +337,7 @@ export const workspacePaths: OpenAPIV3.PathsObject = {
       operationId: 'listWorkspaceMembers',
       summary: 'List workspace members',
       description:
-        'Available to Owner, Admin, and Member. Returns public member data ordered by joinedAt ascending, then userId ascending. Password hashes, sessions, and tokens are never included.',
+        'Available to Owner, Admin, and Member. Returns public member data with effective presence status, ordered by joinedAt ascending, then userId ascending. Offline means no active Socket.IO connection. Password hashes, sessions, and tokens are never included.',
       responses: {
         ...authenticatedResponses,
         '200': successResponse(

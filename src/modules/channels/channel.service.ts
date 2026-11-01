@@ -4,6 +4,7 @@ import {
   requireWorkspaceRole,
 } from '../workspaces/workspace.service.js';
 import { channelErrors } from './channel.errors.js';
+import { channelReadStateRepository } from './channel-read-state.repository.js';
 import {
   channelRepository,
   isChannelNameConflictError,
@@ -14,6 +15,7 @@ import {
 import type {
   CreateChannelInput,
   PublicChannel,
+  PublicChannelWithUnread,
   UpdateChannelInput,
 } from './channel.types.js';
 
@@ -62,20 +64,40 @@ async function createChannel(
 async function listChannels(
   workspaceId: string,
   userId: string
-): Promise<PublicChannel[]> {
+): Promise<PublicChannelWithUnread[]> {
   await requireWorkspaceMember(workspaceId, userId);
-  const channels = await channelRepository.listWorkspaceChannels(workspaceId);
-  return channels.map(toPublicChannel);
+  const [channels, counts] = await Promise.all([
+    channelRepository.listWorkspaceChannels(workspaceId),
+    channelReadStateRepository.countUnread(workspaceId, userId),
+  ]);
+  return channels.map(channel => {
+    const unreadCount = counts.get(channel.id) ?? 0;
+    return {
+      ...toPublicChannel(channel),
+      unreadCount,
+      hasUnread: unreadCount > 0,
+    };
+  });
 }
 
 async function getChannel(
   workspaceId: string,
   userId: string,
   channelId: string
-): Promise<PublicChannel> {
+): Promise<PublicChannelWithUnread> {
   await requireWorkspaceMember(workspaceId, userId);
   const channel = await requireChannel(workspaceId, channelId);
-  return toPublicChannel(channel);
+  const counts = await channelReadStateRepository.countUnread(
+    workspaceId,
+    userId,
+    channelId
+  );
+  const unreadCount = counts.get(channel.id) ?? 0;
+  return {
+    ...toPublicChannel(channel),
+    unreadCount,
+    hasUnread: unreadCount > 0,
+  };
 }
 
 async function updateChannel(

@@ -3,6 +3,7 @@ import { app } from './app.js';
 import { env } from './config/env.js';
 import { logger } from './config/logger.js';
 import { prisma } from './database/client.js';
+import { presenceService } from './modules/presence/presence.service.js';
 import { announcementQueue } from './queues/announcement.queue.js';
 import { closeRedis, redis } from './redis/client.js';
 import { initializeSocket } from './socket/index.js';
@@ -34,6 +35,12 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
     await io.close();
   } catch (error) {
     logger.error({ err: error }, 'Failed to close HTTP / Socket.IO');
+    exitCode = 1;
+  }
+  try {
+    await presenceService.close();
+  } catch (error) {
+    logger.error({ err: error }, 'Failed to close presence');
     exitCode = 1;
   }
 
@@ -93,6 +100,7 @@ async function bootstrap(): Promise<void> {
   } catch (error) {
     logger.error({ err: error }, 'Notification subscription unavailable');
   }
+  await presenceService.start();
   if (shuttingDown) return;
 
   httpServer.listen(env.PORT, () => {

@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import type { WorkspaceRole } from '../../generated/prisma/client.js';
+import type { PresenceStatus } from '../presence/presence.service.js';
 import type {
   createWorkspaceSchema,
   updateMemberRoleSchema,
@@ -33,4 +34,5 @@ export type PublicWorkspaceMember = {
   email: string;
   role: WorkspaceRole;
   joinedAt: string;
+  status: PresenceStatus;
 };
