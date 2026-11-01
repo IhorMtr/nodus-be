@@ -4,6 +4,7 @@ import { AppError } from '../../shared/errors/app-error.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
 import { socketPublisher } from '../../socket/socket.publisher.js';
+import { notificationBridge } from '../../socket/notification.bridge.js';
 import { workspaceService } from './workspace.service.js';
 import type {
   CreateWorkspaceInput,
@@ -123,5 +124,10 @@ export const removeMember: RequestHandler<
     req.params.workspaceId,
     req.params.userId
   );
+  void notificationBridge.publishDirect({
+    kind: 'workspace-revoked',
+    workspaceId: req.params.workspaceId,
+    userId: req.params.userId,
+  });
   res.json(successResponse(null));
 };

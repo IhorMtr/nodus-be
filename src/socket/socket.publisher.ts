@@ -1,9 +1,16 @@
 import { logger } from '../config/logger.js';
 import type { PublicMessage } from '../modules/messages/message.types.js';
+import type { PublicDirectMessage } from '../modules/conversations/conversation.types.js';
 import type { PublicNotification } from '../modules/notifications/notification.types.js';
 import type { PresenceUpdate } from '../modules/presence/presence.service.js';
 import { SOCKET_EVENTS } from './socket-events.js';
-import { channelRoom, channelRoomPrefix, userRoom } from './socket.rooms.js';
+import {
+  channelRoom,
+  channelRoomPrefix,
+  conversationRoom,
+  conversationRoomPrefix,
+  userRoom,
+} from './socket.rooms.js';
 import type { SocketServer } from './socket.types.js';
 
 // ==================== PUBLISHER ====================
@@ -75,6 +82,46 @@ class SocketPublisher {
 
   // ==================== NOTIFICATIONS ====================
 
+  publishDirectMessageCreated(
+    workspaceId: string,
+    message: PublicDirectMessage
+  ): void {
+    this.#publish('direct-message:created', io =>
+      io
+        .to(conversationRoom(workspaceId, message.conversationId))
+        .emit(SOCKET_EVENTS.DIRECT_MESSAGE_CREATED, { workspaceId, message })
+    );
+  }
+
+  publishDirectMessageUpdated(
+    workspaceId: string,
+    message: PublicDirectMessage
+  ): void {
+    this.#publish('direct-message:updated', io =>
+      io
+        .to(conversationRoom(workspaceId, message.conversationId))
+        .emit(SOCKET_EVENTS.DIRECT_MESSAGE_UPDATED, { workspaceId, message })
+    );
+  }
+
+  publishDirectMessageDeleted(
+    workspaceId: string,
+    conversationId: string,
+    messageId: string
+  ): void {
+    this.#publish('direct-message:deleted', io =>
+      io
+        .to(conversationRoom(workspaceId, conversationId))
+        .emit(SOCKET_EVENTS.DIRECT_MESSAGE_DELETED, {
+          workspaceId,
+          conversationId,
+          messageId,
+        })
+    );
+  }
+
+  // ==================== NOTIFICATIONS ====================
+
   publishNotificationCreated(notification: PublicNotification): void {
     this.#publish('notification:created', io => {
       io.to(userRoom(notification.userId)).emit(
@@ -107,12 +154,15 @@ class SocketPublisher {
 
     try {
       const userSockets = this.#socketServer.in(userRoom(userId));
-      const prefix = channelRoomPrefix(workspaceId);
+      const prefixes = [
+        channelRoomPrefix(workspaceId),
+        conversationRoomPrefix(workspaceId),
+      ];
       const rooms = new Set<string>();
 
       for (const socket of await userSockets.fetchSockets()) {
         for (const room of socket.rooms) {
-          if (room.startsWith(prefix)) rooms.add(room);
+          if (prefixes.some(prefix => room.startsWith(prefix))) rooms.add(room);
         }
       }
 

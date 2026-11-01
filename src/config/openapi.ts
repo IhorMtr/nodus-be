@@ -2,6 +2,10 @@ import type { OpenAPIV3 } from 'openapi-types';
 
 import { authPaths, authSchemas } from '../modules/auth/auth.openapi.js';
 import {
+  conversationPaths,
+  conversationSchemas,
+} from '../modules/conversations/conversation.openapi.js';
+import {
   announcementPaths,
   announcementSchemas,
 } from '../modules/announcements/announcement.openapi.js';
@@ -56,6 +60,10 @@ export const openApiDocument: OpenAPIV3.Document = {
       description: 'Workspace channels and workspace role authorization.',
     },
     {
+      name: 'Conversations',
+      description: 'Workspace direct conversations and messages.',
+    },
+    {
       name: 'Messages',
       description:
         'Channel messages, cursor-based history, and author or moderator permissions.',
@@ -101,6 +109,7 @@ export const openApiDocument: OpenAPIV3.Document = {
       ...userSchemas,
       ...workspaceSchemas,
       ...channelSchemas,
+      ...conversationSchemas,
       ...messageSchemas,
       ...searchSchemas,
       ...inviteSchemas,
@@ -154,6 +163,7 @@ export const openApiDocument: OpenAPIV3.Document = {
     ...userPaths,
     ...workspacePaths,
     ...channelPaths,
+    ...conversationPaths,
     ...messagePaths,
     ...searchPaths,
     ...invitePaths,

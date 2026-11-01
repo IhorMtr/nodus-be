@@ -7,6 +7,7 @@ import { presenceService } from '../modules/presence/presence.service.js';
 import { SOCKET_EVENTS } from './socket-events.js';
 import { authenticateSocket } from './socket.auth.js';
 import { registerChannelHandlers } from './socket.channels.js';
+import { registerConversationHandlers } from './socket.conversations.js';
 import { socketPublisher } from './socket.publisher.js';
 import { userRoom } from './socket.rooms.js';
 import type {
@@ -41,6 +42,7 @@ export function initializeSocket(httpServer: HttpServer): SocketServer {
     // The default in-memory adapter joins synchronously, before any client event is handled.
     void socket.join(userRoom(userId));
     registerChannelHandlers(socket);
+    registerConversationHandlers(socket);
     const connected = presenceService.connect(userId, socket.id);
 
     socket.on(SOCKET_EVENTS.DISCONNECT, reason => {

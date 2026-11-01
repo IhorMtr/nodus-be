@@ -2,6 +2,7 @@ import { SOCKET_EVENTS } from '../socket/socket-events.js';
 import {
   channelRoom,
   channelRoomPrefix,
+  conversationRoom,
   userRoom,
 } from '../socket/socket.rooms.js';
 import type {
@@ -17,6 +18,7 @@ const SOCKET_IO_PATH = '/socket.io/';
 
 const USER_ROOM = userRoom('{userId}');
 const CHANNEL_ROOM = channelRoom('{workspaceId}', '{channelId}');
+const CONVERSATION_ROOM = conversationRoom('{workspaceId}', '{conversationId}');
 const WORKSPACE_CHANNEL_ROOMS = `${channelRoomPrefix('{workspaceId}')}*`;
 
 const EXAMPLE_IDS = {
@@ -99,6 +101,7 @@ Socket.IO is an ephemeral notification channel, not a message queue. Events are 
 | --- | --- | --- |
 | \`${USER_ROOM}\` | automatically, after authentication | all sockets of one user (every tab and device) |
 | \`${CHANNEL_ROOM}\` | by \`channel:join\` | delivery scope of the message events |
+| \`${CONVERSATION_ROOM}\` | by \`conversation:join\` | delivery scope of direct message events |
 `.trim();
 
 const joinChannelDescription = `
@@ -152,7 +155,7 @@ Sent after a message has been deleted from PostgreSQL by \`DELETE /workspaces/{w
 const workspaceAccessRevokedDescription = `
 Sent after a member has been removed from a workspace by \`DELETE /workspaces/{workspaceId}/members/{userId}\` in the REST API, once the membership is deleted from PostgreSQL. This is currently its only trigger.
 
-The event is targeted through the user room \`${USER_ROOM}\` of the removed user, so every socket of that user receives it. Before it is sent, those sockets are removed from all rooms \`${WORKSPACE_CHANNEL_ROOMS}\` of that workspace, so they receive no further message events from it.
+The event is targeted through the user room \`${USER_ROOM}\` of the removed user, so every socket of that user receives it. Before it is sent, those sockets are removed from channel rooms \`${WORKSPACE_CHANNEL_ROOMS}\` and conversation rooms in that workspace, so they receive no further message events from it. Revocation is forwarded through the existing Redis pub/sub bridge to other API processes.
 
 The socket connection stays open. Rooms of other workspaces and the user's access to them are not affected. Clients should leave that workspace in the UI and refetch their navigation.
 `.trim();
@@ -217,6 +220,36 @@ export const asyncApiDocument = {
     },
   },
   channels: {
+    conversationJoin: {
+      address: received(SOCKET_EVENTS.CONVERSATION_JOIN),
+      title: 'Join a conversation',
+      messages: { ConversationJoin: messageRef('ConversationJoin') },
+      'x-socketio-room': { name: CONVERSATION_ROOM, effect: 'join' },
+    },
+    conversationLeave: {
+      address: received(SOCKET_EVENTS.CONVERSATION_LEAVE),
+      title: 'Leave a conversation',
+      messages: { ConversationLeave: messageRef('ConversationLeave') },
+      'x-socketio-room': { name: CONVERSATION_ROOM, effect: 'leave' },
+    },
+    directMessageCreated: {
+      address: sent(SOCKET_EVENTS.DIRECT_MESSAGE_CREATED),
+      title: 'Direct message created',
+      messages: { DirectMessageCreated: messageRef('DirectMessageCreated') },
+      'x-socketio-room': { name: CONVERSATION_ROOM, effect: 'emit' },
+    },
+    directMessageUpdated: {
+      address: sent(SOCKET_EVENTS.DIRECT_MESSAGE_UPDATED),
+      title: 'Direct message updated',
+      messages: { DirectMessageUpdated: messageRef('DirectMessageUpdated') },
+      'x-socketio-room': { name: CONVERSATION_ROOM, effect: 'emit' },
+    },
+    directMessageDeleted: {
+      address: sent(SOCKET_EVENTS.DIRECT_MESSAGE_DELETED),
+      title: 'Direct message deleted',
+      messages: { DirectMessageDeleted: messageRef('DirectMessageDeleted') },
+      'x-socketio-room': { name: CONVERSATION_ROOM, effect: 'emit' },
+    },
     channelJoin: {
       address: received(SOCKET_EVENTS.CHANNEL_JOIN),
       title: 'Join a channel room',
@@ -280,6 +313,52 @@ export const asyncApiDocument = {
     },
   },
   operations: {
+    joinConversation: {
+      action: 'receive',
+      channel: channelRef('conversationJoin'),
+      title: 'Join a conversation',
+      description:
+        'Authenticated participants with current workspace membership may join. Rejoin after reconnect, then reload REST history.',
+      messages: [channelMessageRef('conversationJoin', 'ConversationJoin')],
+      'x-ack': channelAck([
+        'ValidationFailed',
+        'WorkspaceNotFound',
+        'ConversationNotFound',
+        'InternalError',
+      ]),
+    },
+    leaveConversation: {
+      action: 'receive',
+      channel: channelRef('conversationLeave'),
+      title: 'Leave a conversation',
+      messages: [channelMessageRef('conversationLeave', 'ConversationLeave')],
+      'x-ack': channelAck(['ValidationFailed', 'InternalError']),
+    },
+    publishDirectMessageCreated: {
+      action: 'send',
+      channel: channelRef('directMessageCreated'),
+      title: 'Publish direct message creation',
+      description: 'Sent after commit. REST remains the source of truth.',
+      messages: [
+        channelMessageRef('directMessageCreated', 'DirectMessageCreated'),
+      ],
+    },
+    publishDirectMessageUpdated: {
+      action: 'send',
+      channel: channelRef('directMessageUpdated'),
+      title: 'Publish direct message update',
+      messages: [
+        channelMessageRef('directMessageUpdated', 'DirectMessageUpdated'),
+      ],
+    },
+    publishDirectMessageDeleted: {
+      action: 'send',
+      channel: channelRef('directMessageDeleted'),
+      title: 'Publish direct message deletion',
+      messages: [
+        channelMessageRef('directMessageDeleted', 'DirectMessageDeleted'),
+      ],
+    },
     joinChannel: {
       action: 'receive',
       channel: channelRef('channelJoin'),
@@ -362,6 +441,26 @@ export const asyncApiDocument = {
   },
   components: {
     messages: {
+      ConversationJoin: {
+        name: SOCKET_EVENTS.CONVERSATION_JOIN,
+        payload: schemaRef('ConversationSubscription'),
+      },
+      ConversationLeave: {
+        name: SOCKET_EVENTS.CONVERSATION_LEAVE,
+        payload: schemaRef('ConversationSubscription'),
+      },
+      DirectMessageCreated: {
+        name: SOCKET_EVENTS.DIRECT_MESSAGE_CREATED,
+        payload: schemaRef('DirectMessagePayload'),
+      },
+      DirectMessageUpdated: {
+        name: SOCKET_EVENTS.DIRECT_MESSAGE_UPDATED,
+        payload: schemaRef('DirectMessagePayload'),
+      },
+      DirectMessageDeleted: {
+        name: SOCKET_EVENTS.DIRECT_MESSAGE_DELETED,
+        payload: schemaRef('DirectMessageDeletedPayload'),
+      },
       ChannelJoin: {
         name: SOCKET_EVENTS.CHANNEL_JOIN,
         title: 'channel:join',
@@ -500,6 +599,54 @@ export const asyncApiDocument = {
       },
     },
     schemas: {
+      ConversationSubscription: {
+        type: 'object',
+        required: ['workspaceId', 'conversationId'],
+        additionalProperties: false,
+        properties: {
+          workspaceId: uuid('Workspace id.'),
+          conversationId: uuid('Conversation id.'),
+        },
+      },
+      PublicDirectMessage: {
+        type: 'object',
+        required: [
+          'id',
+          'conversationId',
+          'author',
+          'content',
+          'createdAt',
+          'updatedAt',
+        ],
+        additionalProperties: false,
+        properties: {
+          id: uuid('Message id.'),
+          conversationId: uuid('Conversation id.'),
+          author: schemaRef('MessageAuthor'),
+          content: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      DirectMessagePayload: {
+        type: 'object',
+        required: ['workspaceId', 'message'],
+        additionalProperties: false,
+        properties: {
+          workspaceId: uuid('Workspace id.'),
+          message: schemaRef('PublicDirectMessage'),
+        },
+      },
+      DirectMessageDeletedPayload: {
+        type: 'object',
+        required: ['workspaceId', 'conversationId', 'messageId'],
+        additionalProperties: false,
+        properties: {
+          workspaceId: uuid('Workspace id.'),
+          conversationId: uuid('Conversation id.'),
+          messageId: uuid('Message id.'),
+        },
+      },
       PresenceUpdate: {
         type: 'object',
         required: ['userId', 'status'],
@@ -526,7 +673,22 @@ export const asyncApiDocument = {
       SocketAck: {
         description:
           'Acknowledgement of channel:join and channel:leave. It has the same envelope as the REST API responses.',
-        oneOf: [schemaRef('SocketAckSuccess'), schemaRef('SocketAckError')],
+        oneOf: [
+          schemaRef('SocketAckSuccess'),
+          schemaRef('ConversationAckSuccess'),
+          schemaRef('SocketAckError'),
+        ],
+      },
+      ConversationAckSuccess: {
+        type: 'object',
+        required: ['success', 'data', 'messageType', 'errors'],
+        additionalProperties: false,
+        properties: {
+          success: { const: true },
+          data: schemaRef('ConversationSubscription'),
+          messageType: { type: 'null' },
+          errors: { type: 'null' },
+        },
       },
       SocketAckSuccess: {
         type: 'object',
@@ -552,6 +714,7 @@ export const asyncApiDocument = {
               'ValidationFailed',
               'WorkspaceNotFound',
               'ChannelNotFound',
+              'ConversationNotFound',
               'InternalError',
             ],
             description: 'Machine-readable application error code.',
@@ -658,6 +821,7 @@ export const asyncApiDocument = {
               'AnnouncementPublished',
               'WorkspaceRoleChanged',
               'WorkspaceRemoved',
+              'DirectMessageCreated',
             ],
           },
           entityId: {
@@ -681,6 +845,11 @@ export const asyncApiDocument = {
       name: CHANNEL_ROOM,
       description:
         'Joined with channel:join after server-side authorization and left with channel:leave. Delivery scope of the message events.',
+    },
+    conversation: {
+      name: CONVERSATION_ROOM,
+      description:
+        'Joined with conversation:join after participant and workspace checks. Leave with conversation:leave and rejoin after reconnect. Delivery scope of direct message events.',
     },
   },
 };

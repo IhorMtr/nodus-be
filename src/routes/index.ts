@@ -7,6 +7,7 @@ import { env } from '../config/env.js';
 import { authRouter } from '../modules/auth/auth.routes.js';
 import { announcementRouter } from '../modules/announcements/announcement.routes.js';
 import { channelRouter } from '../modules/channels/channel.routes.js';
+import { conversationRouter } from '../modules/conversations/conversation.routes.js';
 import { messageRouter } from '../modules/messages/message.routes.js';
 import { searchRouter } from '../modules/search/search.routes.js';
 import {
@@ -41,6 +42,7 @@ router.use(
   messageRouter
 );
 router.use('/workspaces/:workspaceId/channels', channelRouter);
+router.use('/workspaces/:workspaceId/conversations', conversationRouter);
 router.use('/workspaces', workspaceRouter);
 
 // ==================== DEVELOPMENT DOCS ====================

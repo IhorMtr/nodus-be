@@ -1,6 +1,7 @@
 import type { Server, Socket } from 'socket.io';
 
 import type { PublicMessage } from '../modules/messages/message.types.js';
+import type { PublicDirectMessage } from '../modules/conversations/conversation.types.js';
 import type { PublicNotification } from '../modules/notifications/notification.types.js';
 import type { PresenceUpdate } from '../modules/presence/presence.service.js';
 import type { ApiResponse } from '../shared/types/api-response.js';
@@ -11,6 +12,20 @@ import type { SOCKET_EVENTS } from './socket-events.js';
 export type ChannelSubscription = {
   workspaceId: string;
   channelId: string;
+};
+
+export type ConversationSubscription = {
+  workspaceId: string;
+  conversationId: string;
+};
+export type DirectMessagePayload = {
+  workspaceId: string;
+  message: PublicDirectMessage;
+};
+export type DirectMessageDeletedPayload = {
+  workspaceId: string;
+  conversationId: string;
+  messageId: string;
 };
 
 export type MessagePayload = {
@@ -34,6 +49,14 @@ export type SocketAck<T> = ApiResponse<T>;
 // ==================== EVENT MAPS ====================
 
 export type ClientToServerEvents = {
+  [SOCKET_EVENTS.CONVERSATION_JOIN]: (
+    payload: ConversationSubscription,
+    ack: (response: SocketAck<ConversationSubscription>) => void
+  ) => void;
+  [SOCKET_EVENTS.CONVERSATION_LEAVE]: (
+    payload: ConversationSubscription,
+    ack: (response: SocketAck<ConversationSubscription>) => void
+  ) => void;
   [SOCKET_EVENTS.CHANNEL_JOIN]: (
     payload: ChannelSubscription,
     ack: (response: SocketAck<ChannelSubscription>) => void
@@ -45,6 +68,15 @@ export type ClientToServerEvents = {
 };
 
 export type ServerToClientEvents = {
+  [SOCKET_EVENTS.DIRECT_MESSAGE_CREATED]: (
+    payload: DirectMessagePayload
+  ) => void;
+  [SOCKET_EVENTS.DIRECT_MESSAGE_UPDATED]: (
+    payload: DirectMessagePayload
+  ) => void;
+  [SOCKET_EVENTS.DIRECT_MESSAGE_DELETED]: (
+    payload: DirectMessageDeletedPayload
+  ) => void;
   [SOCKET_EVENTS.MESSAGE_CREATED]: (payload: MessagePayload) => void;
   [SOCKET_EVENTS.MESSAGE_UPDATED]: (payload: MessagePayload) => void;
   [SOCKET_EVENTS.MESSAGE_DELETED]: (payload: MessageDeletedPayload) => void;

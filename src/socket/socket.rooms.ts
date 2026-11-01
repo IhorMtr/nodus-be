@@ -1,3 +1,5 @@
+// ==================== ROOM NAMES ====================
+
 // Room names are case sensitive; callers pass UUIDs already normalized to lowercase.
 
 export function userRoom(userId: string): string {
@@ -10,4 +12,15 @@ export function channelRoomPrefix(workspaceId: string): string {
 
 export function channelRoom(workspaceId: string, channelId: string): string {
   return `${channelRoomPrefix(workspaceId)}${channelId}`;
+}
+
+export function conversationRoomPrefix(workspaceId: string): string {
+  return `workspace:${workspaceId}:conversation:`;
+}
+
+export function conversationRoom(
+  workspaceId: string,
+  conversationId: string
+): string {
+  return `${conversationRoomPrefix(workspaceId)}${conversationId}`;
 }

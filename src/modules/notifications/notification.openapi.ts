@@ -44,6 +44,7 @@ export const notificationSchemas: Record<string, OpenAPIV3.SchemaObject> = {
           'AnnouncementPublished',
           'WorkspaceRoleChanged',
           'WorkspaceRemoved',
+          'DirectMessageCreated',
         ],
       },
       entityId: { type: 'string', format: 'uuid', nullable: true },

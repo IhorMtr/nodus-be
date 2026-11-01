@@ -25,6 +25,9 @@ model User {
   messages                Message[]
   announcements           Announcement[]
   notifications           Notification[]
+  conversationsAsFirst    Conversation[]     @relation("ConversationFirstUser")
+  conversationsAsSecond   Conversation[]     @relation("ConversationSecondUser")
+  directMessages          DirectMessage[]
 }
 
 enum PresencePreference {
@@ -48,12 +51,14 @@ model Workspace {
   invites       WorkspaceInvite[]
   channels      Channel[]
   announcements Announcement[]
+  conversations Conversation[]
 }
 
 enum NotificationType {
   AnnouncementPublished
   WorkspaceRoleChanged
   WorkspaceRemoved
+  DirectMessageCreated
 }
 
 model Notification {
@@ -146,10 +151,58 @@ model WorkspaceMember {
   workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
   channelReadStates ChannelReadState[]
+  conversationReadStates ConversationReadState[]
   // A partial unique index in add_workspaces enforces at most one Owner per workspace.
 
   @@id([workspaceId, userId])
   @@index([userId])
+}
+
+model Conversation {
+  id            String                  @id @default(uuid()) @db.Uuid
+  workspaceId   String                  @db.Uuid
+  firstUserId   String                  @db.Uuid
+  secondUserId  String                  @db.Uuid
+  createdAt     DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime                @updatedAt @db.Timestamptz(3)
+  workspace     Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  firstUser     User                    @relation("ConversationFirstUser", fields: [firstUserId], references: [id], onDelete: Restrict)
+  secondUser    User                    @relation("ConversationSecondUser", fields: [secondUserId], references: [id], onDelete: Restrict)
+  messages      DirectMessage[]
+  readStates    ConversationReadState[]
+
+  @@unique([workspaceId, firstUserId, secondUserId])
+  @@unique([id, workspaceId])
+  @@index([workspaceId, firstUserId])
+  @@index([workspaceId, secondUserId])
+}
+
+model DirectMessage {
+  id             String       @id @default(uuid()) @db.Uuid
+  conversationId String       @db.Uuid
+  authorId       String       @db.Uuid
+  content        String       @db.VarChar(4000)
+  createdAt      DateTime     @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime     @updatedAt @db.Timestamptz(3)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  author         User         @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([conversationId, createdAt(sort: Desc), id(sort: Desc)])
+}
+
+model ConversationReadState {
+  userId            String          @db.Uuid
+  workspaceId       String          @db.Uuid
+  conversationId    String          @db.Uuid
+  lastReadMessageId String          @db.Uuid
+  lastReadCreatedAt DateTime        @db.Timestamptz(3)
+  lastReadAt        DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
+  member            WorkspaceMember @relation(fields: [workspaceId, userId], references: [workspaceId, userId], onDelete: Cascade)
+  conversation      Conversation    @relation(fields: [conversationId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@id([userId, conversationId])
+  @@index([conversationId, userId])
 }
 
 model WorkspaceInvite {

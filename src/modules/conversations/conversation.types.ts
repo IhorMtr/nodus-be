@@ -1,0 +1,59 @@
+import type { z } from 'zod';
+import type { PresenceStatus } from '../presence/presence.service.js';
+import type {
+  conversationParamsSchema,
+  createConversationSchema,
+  directHistorySchema,
+  directMessageParamsSchema,
+  directMessageSchema,
+  markConversationReadSchema,
+  workspaceParamsSchema,
+} from './conversation.schema.js';
+
+// ==================== REQUEST TYPES ====================
+
+export type WorkspaceParams = z.infer<typeof workspaceParamsSchema>;
+export type ConversationParams = z.infer<typeof conversationParamsSchema>;
+export type DirectMessageParams = z.infer<typeof directMessageParamsSchema>;
+export type CreateConversationInput = z.infer<typeof createConversationSchema>;
+export type DirectMessageInput = z.infer<typeof directMessageSchema>;
+export type DirectHistoryQuery = z.infer<typeof directHistorySchema>;
+export type MarkConversationReadInput = z.infer<
+  typeof markConversationReadSchema
+>;
+
+// ==================== RESPONSE TYPES ====================
+
+export type PublicDirectMessage = {
+  id: string;
+  conversationId: string;
+  author: { id: string; firstName: string; lastName: string };
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type PublicConversation = {
+  id: string;
+  workspaceId: string;
+  otherUser: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    status: PresenceStatus;
+  };
+  createdAt: string;
+  updatedAt: string;
+  lastMessage: PublicDirectMessage | null;
+  unreadCount: number;
+  hasUnread: boolean;
+};
+
+export type DirectHistory = {
+  items: PublicDirectMessage[];
+  nextCursor: string | null;
+};
+export type PublicConversationReadState = {
+  lastReadMessageId: string;
+  lastReadAt: string;
+};
