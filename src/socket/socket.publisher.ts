@@ -43,18 +43,10 @@ class SocketPublisher {
 
   publishMessageCreated(workspaceId: string, message: PublicMessage): void {
     this.#publish('message:created', io => {
-      const room = channelRoom(workspaceId, message.channelId);
-      logger.info(
-        {
-          workspaceId,
-          channelId: message.channelId,
-          messageId: message.id,
-          room,
-          roomSize: io.sockets.adapter.rooms.get(room)?.size ?? 0,
-        },
-        'Publishing message:created'
+      io.to(channelRoom(workspaceId, message.channelId)).emit(
+        SOCKET_EVENTS.MESSAGE_CREATED,
+        { workspaceId, message }
       );
-      io.to(room).emit(SOCKET_EVENTS.MESSAGE_CREATED, { workspaceId, message });
     });
   }
 
@@ -80,7 +72,7 @@ class SocketPublisher {
     });
   }
 
-  // ==================== NOTIFICATIONS ====================
+  // ==================== DIRECT MESSAGE EVENTS ====================
 
   publishDirectMessageCreated(
     workspaceId: string,

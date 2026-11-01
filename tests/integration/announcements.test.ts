@@ -10,6 +10,8 @@ import {
 import { closeRedis } from '../../src/redis/client.js';
 import { authorization, createUser, testEmailPrefix } from './helpers.js';
 
+// ==================== TYPES ====================
+
 type Body<T> = { data: T; messageType: string | null };
 type Announcement = {
   id: string;
@@ -17,6 +19,8 @@ type Announcement = {
   publishedAt: string | null;
   title: string;
 };
+// ==================== HELPERS ====================
+
 const createdJobs = new Set<string>();
 
 function track(id: string, version = 0) {
@@ -31,6 +35,8 @@ async function workspace(token: string) {
   expect(result.status).toBe(201);
   return (result.body as Body<{ id: string }>).data.id;
 }
+
+// ==================== SETUP ====================
 
 beforeAll(async () => {
   const name = process.env.DATABASE_URL
@@ -69,6 +75,8 @@ afterAll(async () => {
   await closeRedis();
   await prisma.$disconnect();
 });
+
+// ==================== TESTS ====================
 
 describe('workspace announcements', () => {
   it('publishes immediately and enforces workspace visibility and roles', async () => {

@@ -3,6 +3,8 @@ import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { PrismaClient } from '../generated/prisma/client.js';
 
+// ==================== CLIENT ====================
+
 export const prisma = new PrismaClient({
   errorFormat: 'minimal',
   adapter: new PrismaPg({
@@ -14,6 +16,8 @@ export const prisma = new PrismaClient({
     { emit: 'event', level: 'error' },
   ],
 });
+
+// ==================== LOGGING ====================
 
 // Prisma error messages may include sensitive query arguments.
 prisma.$on('warn', event =>

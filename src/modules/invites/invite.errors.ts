@@ -1,5 +1,7 @@
 import { AppError } from '../../shared/errors/app-error.js';
 
+// ==================== ERRORS ====================
+
 export const inviteErrors = {
   notFound: () => new AppError('Invite not found', 404, 'InviteNotFound'),
   expired: () => new AppError('Invite has expired', 410, 'InviteExpired'),

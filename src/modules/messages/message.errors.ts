@@ -1,5 +1,7 @@
 import { AppError } from '../../shared/errors/app-error.js';
 
+// ==================== ERRORS ====================
+
 export const messageErrors = {
   notFound: () => new AppError('Message not found', 404, 'MessageNotFound'),
   editForbidden: () =>

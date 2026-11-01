@@ -24,6 +24,7 @@ export const updateAnnouncementSchema = z
   .refine(value => Object.keys(value).length > 0, {
     message: 'At least one field is required',
   });
+
 // ==================== PATH PARAMETERS ====================
 
 export const announcementWorkspaceParamsSchema = z.strictObject({

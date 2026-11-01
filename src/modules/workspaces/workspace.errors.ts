@@ -1,5 +1,7 @@
 import { AppError } from '../../shared/errors/app-error.js';
 
+// ==================== ERRORS ====================
+
 export const workspaceErrors = {
   notFound: () => new AppError('Workspace not found', 404, 'WorkspaceNotFound'),
   insufficientRole: () =>

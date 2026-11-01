@@ -80,7 +80,7 @@ After authentication the server joins the socket to its private user room \`${US
 ### Client protocol
 
 1. Connect with the access token.
-2. Emit \`channel:join\` for the channel being opened.
+2. Emit \`channel:join\` for the channel being opened, or \`conversation:join\` for the direct conversation being opened.
 3. Wait for a successful acknowledgement.
 4. Fetch the message history through the REST API.
 5. Merge realtime events with the REST history by \`message.id\`.
@@ -89,7 +89,7 @@ Joining before fetching the history means a message created in between is never 
 
 ### Reconnecting
 
-Room membership is not persistent. After a reconnect the client must emit \`channel:join\` again for the open channel and reload the REST history to recover whatever it missed. The backend stores no socket subscriptions in PostgreSQL or Redis.
+Room membership is not persistent. After a reconnect the client must emit \`channel:join\` or \`conversation:join\` again for the open channel or conversation and reload the REST history to recover whatever it missed. The backend stores no socket subscriptions in PostgreSQL or Redis.
 
 ### Delivery semantics
 
@@ -423,7 +423,7 @@ export const asyncApiDocument = {
       title: 'Publish a notification',
       summary: 'Send notification:created to all sockets of the recipient.',
       description:
-        'Sent after the notification and its source action commit to PostgreSQL. A standalone BullMQ worker forwards committed notifications through Redis pub/sub to API processes. Delivery is best effort; clients should fetch GET /notifications after reconnecting and deduplicate by id.',
+        'Sent after the notification and its source action commit to PostgreSQL. The API process delivers notifications it creates directly; a standalone BullMQ worker, and direct messages sent through another API process, are forwarded through Redis pub/sub. Delivery is best effort; clients should fetch GET /notifications after reconnecting and deduplicate by id.',
       messages: [
         channelMessageRef('notificationCreated', 'NotificationCreated'),
       ],
@@ -672,7 +672,7 @@ export const asyncApiDocument = {
       },
       SocketAck: {
         description:
-          'Acknowledgement of channel:join and channel:leave. It has the same envelope as the REST API responses.',
+          'Acknowledgement of channel:join, channel:leave, conversation:join and conversation:leave. It has the same envelope as the REST API responses.',
         oneOf: [
           schemaRef('SocketAckSuccess'),
           schemaRef('ConversationAckSuccess'),
@@ -825,7 +825,12 @@ export const asyncApiDocument = {
             ],
           },
           entityId: {
-            oneOf: [uuid('Announcement id when applicable.'), { type: 'null' }],
+            oneOf: [
+              uuid(
+                'Announcement id for AnnouncementPublished, direct message id for DirectMessageCreated.'
+              ),
+              { type: 'null' },
+            ],
           },
           title: { type: 'string' },
           message: { type: 'string' },

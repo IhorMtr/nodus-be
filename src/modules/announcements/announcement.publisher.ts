@@ -4,6 +4,8 @@ import { socketPublisher } from '../../socket/socket.publisher.js';
 import { notificationBridge } from '../../socket/notification.bridge.js';
 import { toPublicNotification } from '../notifications/notification.service.js';
 
+// ==================== PUBLICATION ====================
+
 export async function publishAnnouncementJob(
   job: PublishAnnouncementJob
 ): Promise<boolean> {

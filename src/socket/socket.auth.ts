@@ -4,6 +4,8 @@ import { verifyAccessToken } from '../modules/auth/auth.tokens.js';
 import { AppError } from '../shared/errors/app-error.js';
 import type { AppSocket } from './socket.types.js';
 
+// ==================== HANDSHAKE AUTHENTICATION ====================
+
 // Clients send the access token in the handshake `auth` payload, never in the URL.
 export function authenticateSocket(
   socket: AppSocket,

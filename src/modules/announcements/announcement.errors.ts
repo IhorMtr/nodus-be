@@ -1,5 +1,7 @@
 import { AppError } from '../../shared/errors/app-error.js';
 
+// ==================== ERRORS ====================
+
 export const announcementErrors = {
   notFound: () =>
     new AppError('Announcement not found', 404, 'AnnouncementNotFound'),

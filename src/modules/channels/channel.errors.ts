@@ -1,5 +1,7 @@
 import { AppError } from '../../shared/errors/app-error.js';
 
+// ==================== ERRORS ====================
+
 export const channelErrors = {
   notFound: () => new AppError('Channel not found', 404, 'ChannelNotFound'),
   nameAlreadyExists: () =>

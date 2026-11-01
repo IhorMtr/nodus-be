@@ -26,6 +26,7 @@ announcementRouter.use((_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   next();
 });
+
 // ==================== ROUTES ====================
 
 announcementRouter.post(

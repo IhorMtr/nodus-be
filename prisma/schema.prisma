@@ -143,14 +143,14 @@ model ChannelReadState {
 }
 
 model WorkspaceMember {
-  workspaceId       String             @db.Uuid
-  userId            String             @db.Uuid
-  role              WorkspaceRole      @default(Member)
-  createdAt         DateTime           @default(now()) @db.Timestamptz(3)
-  updatedAt         DateTime           @updatedAt @db.Timestamptz(3)
-  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  user              User               @relation(fields: [userId], references: [id], onDelete: Restrict)
-  channelReadStates ChannelReadState[]
+  workspaceId            String                  @db.Uuid
+  userId                 String                  @db.Uuid
+  role                   WorkspaceRole           @default(Member)
+  createdAt              DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime                @updatedAt @db.Timestamptz(3)
+  workspace              Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user                   User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
+  channelReadStates      ChannelReadState[]
   conversationReadStates ConversationReadState[]
   // A partial unique index in add_workspaces enforces at most one Owner per workspace.
 
@@ -159,21 +159,21 @@ model WorkspaceMember {
 }
 
 model Conversation {
-  id            String                  @id @default(uuid()) @db.Uuid
-  workspaceId   String                  @db.Uuid
-  firstUserId   String                  @db.Uuid
-  secondUserId  String                  @db.Uuid
-  createdAt     DateTime                @default(now()) @db.Timestamptz(3)
-  updatedAt     DateTime                @updatedAt @db.Timestamptz(3)
-  workspace     Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  firstUser     User                    @relation("ConversationFirstUser", fields: [firstUserId], references: [id], onDelete: Restrict)
-  secondUser    User                    @relation("ConversationSecondUser", fields: [secondUserId], references: [id], onDelete: Restrict)
-  messages      DirectMessage[]
-  readStates    ConversationReadState[]
+  id           String                  @id @default(uuid()) @db.Uuid
+  workspaceId  String                  @db.Uuid
+  firstUserId  String                  @db.Uuid
+  secondUserId String                  @db.Uuid
+  createdAt    DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime                @updatedAt @db.Timestamptz(3)
+  workspace    Workspace               @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  firstUser    User                    @relation("ConversationFirstUser", fields: [firstUserId], references: [id], onDelete: Restrict)
+  secondUser   User                    @relation("ConversationSecondUser", fields: [secondUserId], references: [id], onDelete: Restrict)
+  messages     DirectMessage[]
+  readStates   ConversationReadState[]
 
+  // The unique index below also serves lookups by workspaceId + firstUserId.
   @@unique([workspaceId, firstUserId, secondUserId])
   @@unique([id, workspaceId])
-  @@index([workspaceId, firstUserId])
   @@index([workspaceId, secondUserId])
 }
 

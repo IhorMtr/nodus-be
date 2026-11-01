@@ -3,11 +3,15 @@ import { verifyAccessToken } from '../modules/auth/auth.tokens.js';
 import type { AuthContext } from '../modules/auth/auth.types.js';
 import { AppError } from '../shared/errors/app-error.js';
 
+// ==================== TYPES ====================
+
 declare module 'express-serve-static-core' {
   interface Request {
     auth?: AuthContext;
   }
 }
+
+// ==================== MIDDLEWARE ====================
 
 export const authenticate: RequestHandler = (req, _res, next) => {
   const authorization = req.get('Authorization');

@@ -5,8 +5,12 @@ import { app } from '../../src/app.js';
 import { prisma } from '../../src/database/client.js';
 import { authorization, createUser, testEmailPrefix } from './helpers.js';
 
+// ==================== TYPES ====================
+
 type ApiBody<T> = { data: T; messageType: string | null };
 type Invite = { id: string; token: string; expiresAt: string; status: string };
+
+// ==================== HELPERS ====================
 
 async function workspace(ownerToken: string): Promise<string> {
   const result = await request(app)
@@ -27,6 +31,8 @@ async function invite(
   expect(result.status).toBe(201);
   return (result.body as ApiBody<Invite>).data;
 }
+
+// ==================== SETUP ====================
 
 beforeAll(async () => {
   const databaseName = process.env.DATABASE_URL
@@ -58,6 +64,8 @@ afterEach(async () => {
 afterAll(async () => {
   await prisma.$disconnect();
 });
+
+// ==================== TESTS ====================
 
 describe('workspace invites', () => {
   it('allows Owner and Admin but denies Member, stores only a hash, and expires after seven days', async () => {

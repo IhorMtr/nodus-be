@@ -3,6 +3,8 @@ import type { ErrorRequestHandler } from 'express';
 import { AppError } from '../shared/errors/app-error.js';
 import { errorResponse } from '../shared/utils/api-response.js';
 
+// ==================== MIDDLEWARE ====================
+
 export const errorMiddleware: ErrorRequestHandler = (
   error: unknown,
   req,

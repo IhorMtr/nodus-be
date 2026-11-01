@@ -71,18 +71,7 @@ async function joinChannel(
     throw error;
   }
 
-  logger.info(
-    {
-      socketId: socket.id,
-      userId,
-      workspaceId,
-      channelId,
-      room,
-      roomSize: socket.nsp.adapter.rooms.get(room)?.size ?? 0,
-      socketRooms: [...socket.rooms],
-    },
-    'Socket joined channel room'
-  );
+  logger.debug({ socketId: socket.id, userId, room }, 'Socket joined channel');
 }
 
 async function leaveChannel(
