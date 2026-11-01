@@ -5,6 +5,7 @@ import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
 import { socketPublisher } from '../../socket/socket.publisher.js';
 import { notificationBridge } from '../../socket/notification.bridge.js';
+import { workspaceMetricsService } from './workspace-metrics.service.js';
 import { workspaceService } from './workspace.service.js';
 import type {
   CreateWorkspaceInput,
@@ -13,6 +14,7 @@ import type {
   UpdateMemberRoleInput,
   UpdateWorkspaceInput,
   WorkspaceMemberParams,
+  WorkspaceMetrics,
   WorkspaceParams,
 } from './workspace.types.js';
 
@@ -130,4 +132,17 @@ export const removeMember: RequestHandler<
     userId: req.params.userId,
   });
   res.json(successResponse(null));
+};
+
+// ==================== METRICS ====================
+
+export const getWorkspaceMetrics: RequestHandler<
+  WorkspaceParams,
+  ApiResponse<WorkspaceMetrics>
+> = async (req, res) => {
+  const metrics = await workspaceMetricsService.get(
+    req.params.workspaceId,
+    authenticatedUserId(req)
+  );
+  res.json(successResponse(metrics));
 };

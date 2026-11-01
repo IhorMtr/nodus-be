@@ -8,6 +8,7 @@ import {
   createWorkspace,
   deleteWorkspace,
   getWorkspace,
+  getWorkspaceMetrics,
   listMembers,
   listWorkspaces,
   removeMember,
@@ -67,4 +68,9 @@ workspaceRouter.delete(
   '/:workspaceId/members/:userId',
   validateParams(workspaceMemberParamsSchema),
   removeMember
+);
+workspaceRouter.get(
+  '/:workspaceId/metrics',
+  validateParams(workspaceParamsSchema),
+  getWorkspaceMetrics
 );

@@ -53,7 +53,8 @@ export const openApiDocument: OpenAPIV3.Document = {
     },
     {
       name: 'Workspaces',
-      description: 'Workspaces, memberships, and basic role authorization.',
+      description:
+        'Workspaces, memberships, basic role authorization, and admin metrics.',
     },
     {
       name: 'Channels',

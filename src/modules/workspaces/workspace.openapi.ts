@@ -109,6 +109,40 @@ const role: OpenAPIV3.SchemaObject = {
   enum: ['Owner', 'Admin', 'Member'],
 };
 
+const count = (description: string): OpenAPIV3.SchemaObject => ({
+  type: 'integer',
+  minimum: 0,
+  description,
+});
+
+const activityPeriod = (days: number): OpenAPIV3.SchemaObject => ({
+  type: 'object',
+  required: [
+    'since',
+    'messages',
+    'directMessages',
+    'announcements',
+    'activeMembers',
+  ],
+  additionalProperties: false,
+  description: `Rolling ${days}-day window ending at generatedAt.`,
+  properties: {
+    since: {
+      type: 'string',
+      format: 'date-time',
+      description: `Inclusive window start: generatedAt minus ${days} days.`,
+    },
+    messages: count('Channel messages created in the window.'),
+    directMessages: count('Direct messages created in the window.'),
+    announcements: count(
+      'Announcements created in the window, including drafts and scheduled ones.'
+    ),
+    activeMembers: count(
+      'Distinct current members who created a channel message, direct message, or announcement in the window. Presence connections do not count.'
+    ),
+  },
+});
+
 export const workspaceSchemas: Record<string, OpenAPIV3.SchemaObject> = {
   Workspace: {
     type: 'object',
@@ -173,6 +207,78 @@ export const workspaceSchemas: Record<string, OpenAPIV3.SchemaObject> = {
       },
     },
   },
+  WorkspaceMetrics: {
+    type: 'object',
+    required: ['generatedAt', 'totals', 'activity'],
+    additionalProperties: false,
+    properties: {
+      generatedAt: {
+        type: 'string',
+        format: 'date-time',
+        description: 'Time the metrics were computed.',
+      },
+      totals: {
+        type: 'object',
+        required: [
+          'members',
+          'channels',
+          'messages',
+          'directMessages',
+          'announcements',
+          'publishedAnnouncements',
+        ],
+        additionalProperties: false,
+        properties: {
+          members: count('Current members, including Owner and Admins.'),
+          channels: count('Channels in the workspace.'),
+          messages: count('Existing channel messages.'),
+          directMessages: count('Existing direct messages.'),
+          announcements: count(
+            'All announcements, including drafts and scheduled ones.'
+          ),
+          publishedAnnouncements: count(
+            'Announcements already visible to members.'
+          ),
+        },
+      },
+      activity: {
+        type: 'object',
+        required: ['last7Days', 'last30Days'],
+        additionalProperties: false,
+        properties: {
+          last7Days: activityPeriod(7),
+          last30Days: activityPeriod(30),
+        },
+      },
+    },
+    example: {
+      generatedAt: '2026-11-01T12:00:00.000Z',
+      totals: {
+        members: 12,
+        channels: 4,
+        messages: 1830,
+        directMessages: 420,
+        announcements: 9,
+        publishedAnnouncements: 7,
+      },
+      activity: {
+        last7Days: {
+          since: '2026-10-25T12:00:00.000Z',
+          messages: 140,
+          directMessages: 38,
+          announcements: 1,
+          activeMembers: 6,
+        },
+        last30Days: {
+          since: '2026-10-02T12:00:00.000Z',
+          messages: 610,
+          directMessages: 150,
+          announcements: 3,
+          activeMembers: 10,
+        },
+      },
+    },
+  },
   WorkspaceResponse: successEnvelope(schemaRef('Workspace')),
   WorkspaceListResponse: successEnvelope({
     type: 'array',
@@ -183,6 +289,7 @@ export const workspaceSchemas: Record<string, OpenAPIV3.SchemaObject> = {
     type: 'array',
     items: schemaRef('WorkspaceMember'),
   }),
+  WorkspaceMetricsResponse: successEnvelope(schemaRef('WorkspaceMetrics')),
   WorkspaceDeleteResponse: successEnvelope({
     type: 'object',
     nullable: true,
@@ -347,6 +454,26 @@ export const workspacePaths: OpenAPIV3.PathsObject = {
         '400': validationResponse(invalidWorkspaceId),
         '404': workspaceNotFound,
         '409': workspaceConflict,
+      },
+    },
+  },
+  '/workspaces/{workspaceId}/metrics': {
+    parameters: [workspaceIdParameter],
+    get: {
+      ...protectedOperation,
+      operationId: 'getWorkspaceMetrics',
+      summary: 'Get workspace metrics',
+      description:
+        'Available to Owner and Admin; Member receives InsufficientWorkspaceRole. Returns totals and activity for fixed rolling 7-day and 30-day windows ending at generatedAt. All counts are computed in one consistent database snapshot from existing data; deleted messages and announcements are not counted. Active members are distinct current members who created a channel message, direct message, or announcement in the window.',
+      responses: {
+        ...authenticatedResponses,
+        '200': successResponse(
+          'Workspace metrics. A new workspace returns zero counts except members and channels.',
+          'WorkspaceMetricsResponse'
+        ),
+        '400': validationResponse(invalidWorkspaceId),
+        '403': insufficientRole,
+        '404': workspaceNotFound,
       },
     },
   },

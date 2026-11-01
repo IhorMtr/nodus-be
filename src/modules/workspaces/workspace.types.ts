@@ -36,3 +36,34 @@ export type PublicWorkspaceMember = {
   joinedAt: string;
   status: PresenceStatus;
 };
+
+// ==================== METRICS TYPES ====================
+
+export type WorkspaceMetricsTotals = {
+  members: number;
+  channels: number;
+  messages: number;
+  directMessages: number;
+  announcements: number;
+  publishedAnnouncements: number;
+};
+
+export type WorkspaceActivityCounts = {
+  messages: number;
+  directMessages: number;
+  announcements: number;
+  activeMembers: number;
+};
+
+export type WorkspaceActivityPeriod = WorkspaceActivityCounts & {
+  since: string;
+};
+
+export type WorkspaceMetrics = {
+  generatedAt: string;
+  totals: WorkspaceMetricsTotals;
+  activity: {
+    last7Days: WorkspaceActivityPeriod;
+    last30Days: WorkspaceActivityPeriod;
+  };
+};
