@@ -1,5 +1,6 @@
 import type { Request, RequestHandler } from 'express';
 import type { ParamsDictionary } from 'express-serve-static-core';
+import { logger } from '../../config/logger.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
@@ -24,6 +25,24 @@ function authenticatedUserId(req: Request): string {
   if (!req.auth)
     throw new AppError('Access token is required', 401, 'Unauthorized');
   return req.auth.userId;
+}
+
+// ==================== REALTIME ====================
+
+async function revokeRealtimeAccess(
+  workspaceId: string,
+  userIds: string[]
+): Promise<void> {
+  try {
+    await socketPublisher.revokeWorkspaceAccess(workspaceId, userIds);
+  } catch (error) {
+    logger.error({ err: error, workspaceId }, 'Realtime revocation failed');
+  }
+  void notificationBridge.publishDirect({
+    kind: 'workspace-revoked',
+    workspaceId,
+    userIds,
+  });
 }
 
 // ==================== WORKSPACE LIFECYCLE ====================
@@ -78,10 +97,11 @@ export const deleteWorkspace: RequestHandler<
   WorkspaceParams,
   ApiResponse<null>
 > = async (req, res) => {
-  await workspaceService.deleteWorkspace(
+  const formerMemberIds = await workspaceService.deleteWorkspace(
     req.params.workspaceId,
     authenticatedUserId(req)
   );
+  await revokeRealtimeAccess(req.params.workspaceId, formerMemberIds);
   res.json(successResponse(null));
 };
 
@@ -121,16 +141,7 @@ export const removeMember: RequestHandler<
     authenticatedUserId(req),
     req.params.userId
   );
-  // The membership is already deleted; this only stops live delivery to the removed user.
-  await socketPublisher.revokeWorkspaceAccess(
-    req.params.workspaceId,
-    req.params.userId
-  );
-  void notificationBridge.publishDirect({
-    kind: 'workspace-revoked',
-    workspaceId: req.params.workspaceId,
-    userId: req.params.userId,
-  });
+  await revokeRealtimeAccess(req.params.workspaceId, [req.params.userId]);
   res.json(successResponse(null));
 };
 

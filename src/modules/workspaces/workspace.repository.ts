@@ -67,11 +67,17 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
     });
   }
 
-  async function deleteWorkspace(workspaceId: string): Promise<void> {
+  // Returns the former member ids so their live subscriptions can be revoked after commit.
+  async function deleteWorkspace(workspaceId: string): Promise<string[]> {
+    const members = await client.workspaceMember.findMany({
+      where: { workspaceId },
+      select: { userId: true },
+    });
     await client.workspace.delete({
       where: { id: workspaceId },
       select: { id: true },
     });
+    return members.map(member => member.userId);
   }
 
   function listMembers(workspaceId: string) {

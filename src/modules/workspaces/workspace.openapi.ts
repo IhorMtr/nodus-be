@@ -423,7 +423,7 @@ export const workspacePaths: OpenAPIV3.PathsObject = {
       operationId: 'deleteWorkspace',
       summary: 'Delete a workspace',
       description:
-        'Available only to Owner. Deletes the workspace and all its memberships atomically.',
+        'Available only to Owner. Deletes the workspace and all its memberships atomically. Connected sockets of every former member then receive workspace:access-revoked and leave the realtime rooms of the workspace.',
       responses: {
         ...authenticatedResponses,
         '200': successResponse(

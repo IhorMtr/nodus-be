@@ -141,13 +141,14 @@ async function updateWorkspace(
   });
 }
 
+// Resolves to the ids of every former member, including the Owner.
 async function deleteWorkspace(
   workspaceId: string,
   userId: string
-): Promise<void> {
+): Promise<string[]> {
   return runWorkspaceTransaction(async repository => {
     await requireWorkspaceRole(workspaceId, userId, ['Owner'], repository);
-    await repository.deleteWorkspace(workspaceId);
+    return repository.deleteWorkspace(workspaceId);
   });
 }
 

@@ -153,9 +153,12 @@ Sent after a message has been deleted from PostgreSQL by \`DELETE /workspaces/{w
 `.trim();
 
 const workspaceAccessRevokedDescription = `
-Sent after a member has been removed from a workspace by \`DELETE /workspaces/{workspaceId}/members/{userId}\` in the REST API, once the membership is deleted from PostgreSQL. This is currently its only trigger.
+Sent once the change is committed to PostgreSQL, in two cases:
 
-The event is targeted through the user room \`${USER_ROOM}\` of the removed user, so every socket of that user receives it. Before it is sent, those sockets are removed from channel rooms \`${WORKSPACE_CHANNEL_ROOMS}\` and conversation rooms in that workspace, so they receive no further message events from it. Revocation is forwarded through the existing Redis pub/sub bridge to other API processes.
+- a member was removed by \`DELETE /workspaces/{workspaceId}/members/{userId}\`: only the removed user receives it;
+- the workspace was deleted by \`DELETE /workspaces/{workspaceId}\`: every former member receives it, including the Owner who deleted it.
+
+The event is targeted through the user room \`${USER_ROOM}\` of each affected user, so every socket of that user receives it. Before it is sent, those sockets are removed from channel rooms \`${WORKSPACE_CHANNEL_ROOMS}\` and conversation rooms in that workspace, so they receive no further message events from it. Revocation is forwarded through the existing Redis pub/sub bridge to other API processes.
 
 The socket connection stays open. Rooms of other workspaces and the user's access to them are not affected. Clients should leave that workspace in the UI and refetch their navigation.
 `.trim();
@@ -290,7 +293,7 @@ export const asyncApiDocument = {
     workspaceAccessRevoked: {
       address: sent(SOCKET_EVENTS.WORKSPACE_ACCESS_REVOKED),
       title: 'Workspace access was revoked',
-      summary: 'The user has been removed from a workspace.',
+      summary: 'The user was removed from a workspace or it was deleted.',
       messages: {
         WorkspaceAccessRevoked: messageRef('WorkspaceAccessRevoked'),
       },
@@ -411,7 +414,7 @@ export const asyncApiDocument = {
       channel: channelRef('workspaceAccessRevoked'),
       title: 'Publish a workspace access revocation',
       summary:
-        'Send workspace:access-revoked to every socket of the removed user.',
+        'Send workspace:access-revoked to every socket of each user who lost access.',
       description: workspaceAccessRevokedDescription,
       messages: [
         channelMessageRef('workspaceAccessRevoked', 'WorkspaceAccessRevoked'),
@@ -567,7 +570,7 @@ export const asyncApiDocument = {
       WorkspaceAccessRevoked: {
         name: SOCKET_EVENTS.WORKSPACE_ACCESS_REVOKED,
         title: 'workspace:access-revoked',
-        summary: 'The user was removed from a workspace.',
+        summary: 'The user lost access to a workspace.',
         contentType: 'application/json',
         payload: schemaRef('WorkspaceAccessRevokedPayload'),
         examples: [
@@ -794,7 +797,7 @@ export const asyncApiDocument = {
         required: ['workspaceId'],
         additionalProperties: false,
         properties: {
-          workspaceId: uuid('Workspace the user was removed from.'),
+          workspaceId: uuid('Workspace the user lost access to.'),
         },
       },
       PublicNotification: {

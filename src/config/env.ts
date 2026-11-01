@@ -52,6 +52,9 @@ const envSchema = z
           )
           .min(1)
       ),
+    // Reverse proxies in front of the app that append to X-Forwarded-For. A number,
+    // never `true`, so a client cannot choose its own IP by forging the header.
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])
       .default('info'),

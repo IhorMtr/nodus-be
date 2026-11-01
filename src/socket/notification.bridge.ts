@@ -32,7 +32,7 @@ type DirectTransport =
       kind: 'workspace-revoked';
       origin: string;
       workspaceId: string;
-      userId: string;
+      userIds: string[];
     };
 type DirectPublish = DirectTransport extends infer T
   ? T extends { origin: string }
@@ -82,7 +82,7 @@ class NotificationBridge {
             case 'workspace-revoked':
               void socketPublisher.revokeWorkspaceAccess(
                 data.workspaceId,
-                data.userId
+                data.userIds
               );
               break;
           }

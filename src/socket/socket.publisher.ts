@@ -137,15 +137,16 @@ class SocketPublisher {
 
   // ==================== ACCESS REVOCATION ====================
 
-  // Drops every channel subscription of the user in the workspace across all their sockets.
+  // Drops every channel and conversation subscription of the users in the workspace
+  // across all their sockets, then tells those sockets that access was revoked.
   async revokeWorkspaceAccess(
     workspaceId: string,
-    userId: string
+    userIds: readonly string[]
   ): Promise<void> {
-    if (!this.#socketServer) return;
+    if (!this.#socketServer || userIds.length === 0) return;
 
     try {
-      const userSockets = this.#socketServer.in(userRoom(userId));
+      const userSockets = this.#socketServer.in(userIds.map(userRoom));
       const prefixes = [
         channelRoomPrefix(workspaceId),
         conversationRoomPrefix(workspaceId),
