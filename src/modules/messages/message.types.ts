@@ -39,4 +39,12 @@ export type PublicMessage = {
 export type MessageHistory = {
   items: PublicMessage[];
   nextCursor: string | null;
+  previousCursor: string | null;
+};
+
+export type MessageContext = {
+  targetMessageId: string;
+  items: PublicMessage[];
+  olderCursor: string | null;
+  newerCursor: string | null;
 };

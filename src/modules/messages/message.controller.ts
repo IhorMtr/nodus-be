@@ -8,6 +8,7 @@ import { messageService } from './message.service.js';
 import type {
   CreateMessageInput,
   MessageChannelParams,
+  MessageContext,
   MessageHistory,
   MessageHistoryQuery,
   MessageParams,
@@ -54,6 +55,19 @@ export const listMessages: RequestHandler<
     res.locals.validatedQuery
   );
   res.json(successResponse(history));
+};
+
+export const getMessageContext: RequestHandler<
+  MessageParams,
+  ApiResponse<MessageContext>
+> = async (req, res) => {
+  const context = await messageService.getMessageContext(
+    req.params.workspaceId,
+    authenticatedUserId(req),
+    req.params.channelId,
+    req.params.messageId
+  );
+  res.json(successResponse(context));
 };
 
 export const updateMessage: RequestHandler<

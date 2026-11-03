@@ -49,12 +49,17 @@ export const cursorSchema = z
     }
   });
 
-export const messageHistoryQuerySchema = z.strictObject({
-  limit: z
-    .string()
-    .regex(/^[0-9]+$/, 'Limit must be an integer')
-    .transform(Number)
-    .pipe(z.number().int().min(1).max(100))
-    .default(50),
-  before: cursorSchema.optional(),
-});
+export const messageHistoryQuerySchema = z
+  .strictObject({
+    limit: z
+      .string()
+      .regex(/^[0-9]+$/, 'Limit must be an integer')
+      .transform(Number)
+      .pipe(z.number().int().min(1).max(100))
+      .default(50),
+    before: cursorSchema.optional(),
+    after: cursorSchema.optional(),
+  })
+  .refine(query => !(query.before && query.after), {
+    message: 'Use either before or after',
+  });

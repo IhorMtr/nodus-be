@@ -170,7 +170,7 @@ export const messageSchemas: Record<string, OpenAPIV3.SchemaObject> = {
   },
   MessageHistory: {
     type: 'object',
-    required: ['items', 'nextCursor'],
+    required: ['items', 'nextCursor', 'previousCursor'],
     additionalProperties: false,
     properties: {
       items: {
@@ -185,10 +185,43 @@ export const messageSchemas: Record<string, OpenAPIV3.SchemaObject> = {
         description:
           'Opaque cursor for the next page of older messages. Pass it unchanged as before. It identifies the oldest message boundary on this page and is null when no older messages remain.',
       },
+      previousCursor: {
+        type: 'string',
+        nullable: true,
+        description:
+          'Opaque cursor for another page of newer messages after an after request. Pass it unchanged as after. Null when no newer messages remain.',
+      },
+    },
+  },
+  MessageContext: {
+    type: 'object',
+    required: ['targetMessageId', 'items', 'olderCursor', 'newerCursor'],
+    additionalProperties: false,
+    properties: {
+      targetMessageId: { type: 'string', format: 'uuid' },
+      items: {
+        type: 'array',
+        items: schemaRef('Message'),
+        description:
+          'Up to 15 older messages, the target, and up to 15 newer messages, ordered by createdAt and id ascending. Includes history read receipts.',
+      },
+      olderCursor: {
+        type: 'string',
+        nullable: true,
+        description:
+          'Pass unchanged as before to GET messages for the next older page; null when no older messages remain.',
+      },
+      newerCursor: {
+        type: 'string',
+        nullable: true,
+        description:
+          'Pass unchanged as after to GET messages for the next newer page; null when no newer messages remain.',
+      },
     },
   },
   MessageResponse: successEnvelope(schemaRef('Message')),
   MessageHistoryResponse: successEnvelope(schemaRef('MessageHistory')),
+  MessageContextResponse: successEnvelope(schemaRef('MessageContext')),
   MessageDeleteResponse: successEnvelope({
     type: 'object',
     nullable: true,
@@ -282,7 +315,7 @@ export const messagePaths: OpenAPIV3.PathsObject = {
       operationId: 'listMessages',
       summary: 'Get channel message history',
       description:
-        'Available to current workspace members. Message history uses cursor-based pagination. Each item includes receipt.read, readerCount and readers for current members other than its author. A message becomes read when another member advances their channel read boundary through it. Without before, returns the newest limit messages. Pass nextCursor as before to request older messages. Selection uses createdAt descending, then id descending; each page is returned oldest to newest. Deleting a boundary message does not reset progress. Unknown query fields are rejected.',
+        'Available to current workspace members. Message history uses cursor-based pagination. Each item includes read receipts. Without a cursor, returns the newest limit messages. Pass nextCursor as before for older messages, or previousCursor as after for newer messages. before and after cannot be combined. Each page is returned oldest to newest by createdAt, then id. Deleting a boundary message does not reset progress. Unknown query fields are rejected.',
       parameters: [
         {
           name: 'limit',
@@ -299,6 +332,14 @@ export const messagePaths: OpenAPIV3.PathsObject = {
             'Opaque cursor returned as nextCursor by the previous page. Pass it unchanged; clients must not depend on its internal structure. Returns messages older than the cursor boundary. An invalid cursor returns 400 ValidationFailed.',
           schema: { type: 'string', minLength: 1, maxLength: 256 },
         },
+        {
+          name: 'after',
+          in: 'query',
+          required: false,
+          description:
+            'Opaque cursor returned as newerCursor by message context or previousCursor by a newer history page. Returns messages newer than the cursor boundary.',
+          schema: { type: 'string', minLength: 1, maxLength: 256 },
+        },
       ],
       responses: {
         ...authenticatedResponses,
@@ -310,11 +351,33 @@ export const messagePaths: OpenAPIV3.PathsObject = {
           ...invalidChannelParams,
           limit: ['Limit must be an integer between 1 and 100'],
           before: ['Invalid cursor'],
+          after: ['Invalid cursor'],
         }),
         '404': channelNotFound,
       },
     },
   },
+  '/workspaces/{workspaceId}/channels/{channelId}/messages/{messageId}/context':
+    {
+      parameters: [
+        workspaceIdParameter,
+        channelIdParameter,
+        messageIdParameter,
+      ],
+      get: {
+        ...protectedOperation,
+        operationId: 'getMessageContext',
+        summary: 'Get channel messages around a target message',
+        description:
+          'Available to current workspace members. Returns the target, up to 15 messages before it and 15 after it in the same public history format, including read receipts. Older and newer cursors continue normal history pagination in either direction. A target from another channel or a deleted target returns MessageNotFound.',
+        responses: {
+          ...authenticatedResponses,
+          '200': successResponse('Message context.', 'MessageContextResponse'),
+          '400': validationResponse(invalidMessageParams),
+          '404': messageNotFound,
+        },
+      },
+    },
   '/workspaces/{workspaceId}/channels/{channelId}/messages/{messageId}': {
     parameters: [workspaceIdParameter, channelIdParameter, messageIdParameter],
     patch: {

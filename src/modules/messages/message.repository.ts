@@ -25,7 +25,7 @@ function createMessage(channelId: string, authorId: string, content: string) {
 
 function listChannelMessages(
   channelId: string,
-  { limit, before }: MessageHistoryQuery
+  { limit, before, after }: MessageHistoryQuery
 ) {
   return prisma.message.findMany({
     where: {
@@ -40,9 +40,50 @@ function listChannelMessages(
             ],
           }
         : {}),
+      ...(after
+        ? {
+            createdAt: { gte: after.createdAt },
+            OR: [
+              { createdAt: { gt: after.createdAt } },
+              { createdAt: after.createdAt, id: { gt: after.id } },
+            ],
+          }
+        : {}),
     },
     select: messageSelect,
-    orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    orderBy: after
+      ? [{ createdAt: 'asc' }, { id: 'asc' }]
+      : [{ createdAt: 'desc' }, { id: 'desc' }],
+    take: limit + 1,
+  });
+}
+
+function listContextSide(
+  channelId: string,
+  target: { createdAt: Date; id: string },
+  direction: 'older' | 'newer',
+  limit: number
+) {
+  const older = direction === 'older';
+  return prisma.message.findMany({
+    where: {
+      channelId,
+      createdAt: older ? { lte: target.createdAt } : { gte: target.createdAt },
+      OR: older
+        ? [
+            { createdAt: { lt: target.createdAt } },
+            { createdAt: target.createdAt, id: { lt: target.id } },
+          ]
+        : [
+            { createdAt: { gt: target.createdAt } },
+            { createdAt: target.createdAt, id: { gt: target.id } },
+          ],
+    },
+    select: messageSelect,
+    orderBy: [
+      { createdAt: older ? 'desc' : 'asc' },
+      { id: older ? 'desc' : 'asc' },
+    ],
     take: limit + 1,
   });
 }
@@ -93,6 +134,7 @@ export function isMessageRelationMissingError(error: unknown): boolean {
 export const messageRepository = {
   createMessage,
   listChannelMessages,
+  listContextSide,
   findMessage,
   updateMessage,
   deleteMessage,

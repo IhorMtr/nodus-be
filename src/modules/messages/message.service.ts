@@ -11,6 +11,7 @@ import {
 import type {
   CreateMessageInput,
   MessageCursor,
+  MessageContext,
   MessageHistory,
   MessageHistoryQuery,
   PublicMessage,
@@ -96,27 +97,69 @@ async function listMessages(
     query
   );
   const page = messages.slice(0, query.limit);
-  const oldest = page.at(-1);
+  const hasMore = messages.length > query.limit;
+  const ordered = query.after ? page : page.reverse();
   const nextCursor =
-    messages.length > query.limit && oldest ? encodeCursor(oldest) : null;
+    !query.after && hasMore && ordered[0] ? encodeCursor(ordered[0]) : null;
+  const previousCursor =
+    query.after && hasMore && ordered.at(-1)
+      ? encodeCursor(ordered.at(-1)!)
+      : null;
+  return {
+    items: await withReceipts(channelId, ordered),
+    nextCursor,
+    previousCursor,
+  };
+}
+
+// ==================== MESSAGE CONTEXT ====================
+
+async function withReceipts(channelId: string, page: MessageRecord[]) {
   const readers = await channelReadStateRepository.receipts(
     channelId,
     page.map(message => message.id)
   );
+  return page.map(message => {
+    const item = toPublicMessage(message);
+    const list = readers.get(item.id) ?? [];
+    return {
+      ...item,
+      receipt: {
+        read: list.length > 0,
+        readerCount: list.length,
+        readers: list,
+      },
+    };
+  });
+}
+
+async function getMessageContext(
+  workspaceId: string,
+  userId: string,
+  channelId: string,
+  messageId: string
+): Promise<MessageContext> {
+  await requireMessageAccess(workspaceId, userId, channelId);
+  const target = await requireMessage(channelId, messageId);
+  const sideSize = 15;
+  const [older, newer] = await Promise.all([
+    messageRepository.listContextSide(channelId, target, 'older', sideSize),
+    messageRepository.listContextSide(channelId, target, 'newer', sideSize),
+  ]);
+  const ordered = [
+    ...older.slice(0, sideSize).reverse(),
+    target,
+    ...newer.slice(0, sideSize),
+  ];
   return {
-    items: page.reverse().map(message => {
-      const item = toPublicMessage(message);
-      const list = readers.get(item.id) ?? [];
-      return {
-        ...item,
-        receipt: {
-          read: list.length > 0,
-          readerCount: list.length,
-          readers: list,
-        },
-      };
-    }),
-    nextCursor,
+    targetMessageId: target.id,
+    items: await withReceipts(channelId, ordered),
+    olderCursor:
+      older.length > sideSize && ordered[0] ? encodeCursor(ordered[0]) : null,
+    newerCursor:
+      newer.length > sideSize && ordered.at(-1)
+        ? encodeCursor(ordered.at(-1)!)
+        : null,
   };
 }
 
@@ -173,6 +216,7 @@ async function deleteMessage(
 export const messageService = {
   createMessage,
   listMessages,
+  getMessageContext,
   updateMessage,
   deleteMessage,
 };

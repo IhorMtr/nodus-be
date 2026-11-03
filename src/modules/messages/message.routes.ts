@@ -8,6 +8,7 @@ import {
 import {
   createMessage,
   deleteMessage,
+  getMessageContext,
   listMessages,
   updateMessage,
 } from './message.controller.js';
@@ -36,6 +37,11 @@ messageRouter.post(
   validateParams(messageChannelParamsSchema),
   validateBody(createMessageSchema),
   createMessage
+);
+messageRouter.get(
+  '/:messageId/context',
+  validateParams(messageParamsSchema),
+  getMessageContext
 );
 messageRouter.get(
   '/',
