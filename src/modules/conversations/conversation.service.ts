@@ -172,7 +172,30 @@ async function history(
           })
         ).toString('base64url')
       : null;
-  return { items: page.reverse().map(toPublicDirectMessage), nextCursor };
+  const record = await conversationRepository.find(conversationId, workspaceId);
+  if (!record) throw conversationErrors.notFound();
+  const recipientId =
+    record.firstUserId === userId ? record.secondUserId : record.firstUserId;
+  const recipientState = await conversationRepository.readState(
+    recipientId,
+    conversationId
+  );
+  return {
+    items: page.reverse().map(message => ({
+      ...toPublicDirectMessage(message),
+      ...(message.authorId === userId
+        ? {
+            read:
+              !!recipientState &&
+              (message.createdAt < recipientState.lastReadCreatedAt ||
+                (message.createdAt.getTime() ===
+                  recipientState.lastReadCreatedAt.getTime() &&
+                  message.id <= recipientState.lastReadMessageId)),
+          }
+        : {}),
+    })),
+    nextCursor,
+  };
 }
 
 async function updateMessage(
@@ -229,7 +252,12 @@ async function markRead(
   userId: string,
   conversationId: string,
   messageId: string
-): Promise<PublicConversationReadState> {
+): Promise<{
+  state: PublicConversationReadState;
+  advanced: boolean;
+  notificationIds: string[];
+  unreadCount: number;
+}> {
   await requireConversation(workspaceId, userId, conversationId);
   const message = await conversationRepository.findMessage(
     conversationId,
@@ -243,12 +271,19 @@ async function markRead(
     messageId
   );
   const current =
-    advanced ??
+    advanced?.state ??
     (await conversationRepository.readState(userId, conversationId));
   if (!current) throw conversationErrors.notFound();
-  return {
+  const state = {
     lastReadMessageId: current.lastReadMessageId,
+    lastReadCreatedAt: current.lastReadCreatedAt.toISOString(),
     lastReadAt: current.lastReadAt.toISOString(),
+  };
+  return {
+    state,
+    advanced: !!advanced,
+    notificationIds: advanced?.notificationIds ?? [],
+    unreadCount: advanced?.unreadCount ?? 0,
   };
 }
 

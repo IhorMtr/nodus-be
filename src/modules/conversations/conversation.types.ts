@@ -31,6 +31,7 @@ export type PublicDirectMessage = {
   content: string;
   createdAt: string;
   updatedAt: string;
+  read?: boolean;
 };
 
 export type PublicConversation = {
@@ -55,5 +56,6 @@ export type DirectHistory = {
 };
 export type PublicConversationReadState = {
   lastReadMessageId: string;
+  lastReadCreatedAt: string;
   lastReadAt: string;
 };

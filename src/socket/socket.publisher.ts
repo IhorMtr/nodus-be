@@ -12,6 +12,11 @@ import {
   userRoom,
 } from './socket.rooms.js';
 import type { SocketServer } from './socket.types.js';
+import type {
+  DirectReadPayload,
+  ChannelReadPayload,
+  NotificationsReadPayload,
+} from './socket.types.js';
 
 // ==================== PUBLISHER ====================
 
@@ -113,6 +118,35 @@ class SocketPublisher {
   }
 
   // ==================== NOTIFICATIONS ====================
+
+  publishDirectRead(payload: DirectReadPayload, recipientIds: string[]): void {
+    if (!recipientIds.length) return;
+    this.#publish('direct-message:read', io =>
+      io
+        .to(recipientIds.map(userRoom))
+        .emit(SOCKET_EVENTS.DIRECT_MESSAGE_READ, payload)
+    );
+  }
+
+  publishChannelRead(
+    payload: ChannelReadPayload,
+    recipientIds: string[]
+  ): void {
+    if (!recipientIds.length) return;
+    this.#publish('message:read', io =>
+      io
+        .to(recipientIds.map(userRoom))
+        .emit(SOCKET_EVENTS.MESSAGE_READ, payload)
+    );
+  }
+
+  publishNotificationsRead(payload: NotificationsReadPayload): void {
+    this.#publish('notifications:read', io =>
+      io
+        .to(userRoom(payload.userId))
+        .emit(SOCKET_EVENTS.NOTIFICATIONS_READ, payload)
+    );
+  }
 
   publishNotificationCreated(notification: PublicNotification): void {
     this.#publish('notification:created', io => {

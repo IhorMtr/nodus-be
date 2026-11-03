@@ -419,6 +419,96 @@ describe('direct conversations', () => {
     ).toBe(0);
   });
 
+  it('returns persistent receipts and marks only confirmed direct notifications read', async () => {
+    const other = await request(app)
+      .post(conversationsUrl())
+      .set(auth(ownerToken))
+      .send({ userId: bystanderId });
+    expect(other.status).toBe(201);
+    const otherId = other.body.data.id as string;
+    const otherMessage = await request(app)
+      .post(`${conversationsUrl()}/${otherId}/messages`)
+      .set(auth(ownerToken))
+      .send({ content: 'Other conversation' });
+    const sent = await request(app)
+      .post(messagesUrl())
+      .set(auth(ownerToken))
+      .send({ content: 'Receipt target' });
+    const messageId = sent.body.data.id as string;
+    await prisma.directMessage.update({
+      where: { id: messageId },
+      data: { createdAt: new Date('2031-01-01T00:00:00.000Z') },
+    });
+    const before = await request(app).get(messagesUrl()).set(auth(ownerToken));
+    expect(
+      before.body.data.items.find(
+        (item: { id: string }) => item.id === messageId
+      ).read
+    ).toBe(false);
+    const memberSocket = await openSocket(memberToken);
+    const ownerSocket = await openSocket(ownerToken);
+    const ownerOtherDevice = await openSocket(ownerToken);
+    const receipts: unknown[] = [];
+    const otherDeviceReceipts: unknown[] = [];
+    const changes: unknown[] = [];
+    ownerSocket.on('direct-message:read', event => receipts.push(event));
+    ownerOtherDevice.on('direct-message:read', event =>
+      otherDeviceReceipts.push(event)
+    );
+    memberSocket.on('notifications:read', event => changes.push(event));
+    await memberSocket.emitWithAck('conversation:join', {
+      workspaceId,
+      conversationId,
+    });
+    expect(
+      (
+        await prisma.notification.findFirstOrThrow({
+          where: { entityId: messageId },
+        })
+      ).readAt
+    ).toBeNull();
+    const marked = await request(app)
+      .put(`${conversationsUrl()}/${conversationId}/read-state`)
+      .set(auth(memberToken))
+      .send({ lastReadMessageId: messageId });
+    expect(marked.status).toBe(200);
+    await awaitEvent(receipts, 1);
+    await awaitEvent(otherDeviceReceipts, 1);
+    await awaitEvent(changes, 1);
+    expect(
+      (
+        await prisma.notification.findFirstOrThrow({
+          where: { entityId: messageId },
+        })
+      ).readAt
+    ).not.toBeNull();
+    expect(
+      (
+        await prisma.notification.findFirstOrThrow({
+          where: { entityId: otherMessage.body.data.id as string },
+        })
+      ).readAt
+    ).toBeNull();
+    const after = await request(app).get(messagesUrl()).set(auth(ownerToken));
+    expect(
+      after.body.data.items.find(
+        (item: { id: string }) => item.id === messageId
+      ).read
+    ).toBe(true);
+    expect(
+      (
+        await request(app)
+          .put(`${conversationsUrl()}/${conversationId}/read-state`)
+          .set(auth(memberToken))
+          .send({ lastReadMessageId: messageId })
+      ).body.data.lastReadMessageId
+    ).toBe(messageId);
+    memberSocket.disconnect();
+    ownerSocket.disconnect();
+    ownerOtherDevice.disconnect();
+    await prisma.conversation.delete({ where: { id: otherId } });
+  });
+
   it('revokes REST and socket access when membership is removed', async () => {
     const member = await openSocket(memberToken);
     const subscription = { workspaceId, conversationId };

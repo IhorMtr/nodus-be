@@ -6,6 +6,7 @@ import { successResponse } from '../../shared/utils/api-response.js';
 import { socketPublisher } from '../../socket/socket.publisher.js';
 import { notificationBridge } from '../../socket/notification.bridge.js';
 import { conversationService } from './conversation.service.js';
+import { conversationRepository } from './conversation.repository.js';
 import type {
   ConversationParams,
   CreateConversationInput,
@@ -152,14 +153,43 @@ export const markConversationRead: RequestHandler<
   ApiResponse<PublicConversationReadState>,
   MarkConversationReadInput
 > = async (req, res) => {
-  res.json(
-    successResponse(
-      await conversationService.markRead(
-        req.params.workspaceId,
-        userId(req),
-        req.params.conversationId,
-        req.body.lastReadMessageId
-      )
-    )
+  const result = await conversationService.markRead(
+    req.params.workspaceId,
+    userId(req),
+    req.params.conversationId,
+    req.body.lastReadMessageId
   );
+  if (result.advanced) {
+    const payload = {
+      workspaceId: req.params.workspaceId,
+      conversationId: req.params.conversationId,
+      readerId: userId(req),
+      ...result.state,
+    };
+    const recipientIds = await conversationRepository.activeParticipants(
+      req.params.workspaceId,
+      req.params.conversationId
+    );
+    if (recipientIds.includes(userId(req))) {
+      socketPublisher.publishDirectRead(payload, recipientIds);
+      void notificationBridge.publishDirect({
+        kind: 'direct-read',
+        payload,
+        recipientIds,
+      });
+    }
+    if (result.notificationIds.length) {
+      const update = {
+        userId: userId(req),
+        notificationIds: result.notificationIds,
+        unreadCount: result.unreadCount,
+      };
+      socketPublisher.publishNotificationsRead(update);
+      void notificationBridge.publishDirect({
+        kind: 'notifications-read',
+        payload: update,
+      });
+    }
+  }
+  res.json(successResponse(result.state));
 };

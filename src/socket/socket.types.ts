@@ -28,6 +28,27 @@ export type DirectMessageDeletedPayload = {
   messageId: string;
 };
 
+export type DirectReadPayload = {
+  workspaceId: string;
+  conversationId: string;
+  readerId: string;
+  lastReadMessageId: string;
+  lastReadCreatedAt: string;
+  lastReadAt: string;
+};
+export type ChannelReadPayload = {
+  workspaceId: string;
+  channelId: string;
+  reader: { id: string; firstName: string; lastName: string };
+  lastReadMessageId: string;
+  lastReadCreatedAt: string;
+};
+export type NotificationsReadPayload = {
+  userId: string;
+  notificationIds: string[];
+  unreadCount: number;
+};
+
 export type MessagePayload = {
   workspaceId: string;
   message: PublicMessage;
@@ -76,6 +97,11 @@ export type ServerToClientEvents = {
   ) => void;
   [SOCKET_EVENTS.DIRECT_MESSAGE_DELETED]: (
     payload: DirectMessageDeletedPayload
+  ) => void;
+  [SOCKET_EVENTS.DIRECT_MESSAGE_READ]: (payload: DirectReadPayload) => void;
+  [SOCKET_EVENTS.MESSAGE_READ]: (payload: ChannelReadPayload) => void;
+  [SOCKET_EVENTS.NOTIFICATIONS_READ]: (
+    payload: NotificationsReadPayload
   ) => void;
   [SOCKET_EVENTS.MESSAGE_CREATED]: (payload: MessagePayload) => void;
   [SOCKET_EVENTS.MESSAGE_UPDATED]: (payload: MessagePayload) => void;

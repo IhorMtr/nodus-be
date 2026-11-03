@@ -13,7 +13,10 @@ export const SOCKET_EVENTS = {
   DIRECT_MESSAGE_CREATED: 'direct-message:created',
   DIRECT_MESSAGE_UPDATED: 'direct-message:updated',
   DIRECT_MESSAGE_DELETED: 'direct-message:deleted',
+  DIRECT_MESSAGE_READ: 'direct-message:read',
+  MESSAGE_READ: 'message:read',
   WORKSPACE_ACCESS_REVOKED: 'workspace:access-revoked',
   NOTIFICATION_CREATED: 'notification:created',
+  NOTIFICATIONS_READ: 'notifications:read',
   PRESENCE_UPDATED: 'presence:updated',
 } as const;

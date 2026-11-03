@@ -140,6 +140,18 @@ export const messageSchemas: Record<string, OpenAPIV3.SchemaObject> = {
         description:
           'Timestamp of the most recent update. There is no separate edited flag or version history.',
       },
+      receipt: schemaRef('ChannelReceipt'),
+    },
+  },
+  ChannelReceipt: {
+    type: 'object',
+    description:
+      'Present in history responses. Counts current workspace members other than the author whose channel read boundary covers this message.',
+    required: ['read', 'readerCount', 'readers'],
+    properties: {
+      read: { type: 'boolean' },
+      readerCount: { type: 'integer', minimum: 0 },
+      readers: { type: 'array', items: schemaRef('MessageAuthor') },
     },
   },
   CreateMessageRequest: {
@@ -270,7 +282,7 @@ export const messagePaths: OpenAPIV3.PathsObject = {
       operationId: 'listMessages',
       summary: 'Get channel message history',
       description:
-        'Available to Owner, Admin, and Member. Message history uses cursor-based pagination. Without before, returns the newest limit messages. Pass nextCursor as before to request older messages. Selection uses createdAt descending, then id descending, so messages with identical timestamps remain stable; each response page is returned oldest to newest. The cursor stores the time and ID boundary, so deleting its anchor message does not invalidate pagination. nextCursor is null when there are no older messages. Only messages from the requested channel are included. Unknown query fields are rejected.',
+        'Available to current workspace members. Message history uses cursor-based pagination. Each item includes receipt.read, readerCount and readers for current members other than its author. A message becomes read when another member advances their channel read boundary through it. Without before, returns the newest limit messages. Pass nextCursor as before to request older messages. Selection uses createdAt descending, then id descending; each page is returned oldest to newest. Deleting a boundary message does not reset progress. Unknown query fields are rejected.',
       parameters: [
         {
           name: 'limit',

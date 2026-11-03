@@ -93,7 +93,9 @@ Room membership is not persistent. After a reconnect the client must emit \`chan
 
 ### Delivery semantics
 
-Socket.IO is an ephemeral notification channel, not a message queue. Events are not stored or replayed, and a client that is offline or has not joined the channel never receives them. No exactly-once guarantee is provided. PostgreSQL, read through the REST API, is the source of truth.
+Socket.IO is an ephemeral notification channel, not a message queue. Events are not stored or replayed. Message creation events require a channel or conversation subscription; read events go to current members' private user rooms. No exactly-once guarantee is provided. PostgreSQL, read through the REST API, is the source of truth.
+
+Read receipts are computed from confirmed REST read-state updates. Room membership, an open conversation, and message delivery do not mark anything read. The read events go to all sockets of current members, including other devices. After reconnect, reload REST history for receipts and GET /notifications for unread state. For message:read, apply the reader to visible messages at or before (lastReadCreatedAt, lastReadMessageId), excluding the reader's own messages; deduplicate by reader id. notifications:read supplies the ids marked read and the current unread count.
 
 ### Rooms
 
@@ -253,6 +255,24 @@ export const asyncApiDocument = {
       messages: { DirectMessageDeleted: messageRef('DirectMessageDeleted') },
       'x-socketio-room': { name: CONVERSATION_ROOM, effect: 'emit' },
     },
+    directMessageRead: {
+      address: sent(SOCKET_EVENTS.DIRECT_MESSAGE_READ),
+      title: 'Direct message read boundary advanced',
+      messages: { DirectMessageRead: messageRef('DirectMessageRead') },
+      'x-socketio-room': { name: USER_ROOM, effect: 'emit' },
+    },
+    messageRead: {
+      address: sent(SOCKET_EVENTS.MESSAGE_READ),
+      title: 'Channel read boundary advanced',
+      messages: { MessageRead: messageRef('MessageRead') },
+      'x-socketio-room': { name: USER_ROOM, effect: 'emit' },
+    },
+    notificationsRead: {
+      address: sent(SOCKET_EVENTS.NOTIFICATIONS_READ),
+      title: 'Direct notifications marked read',
+      messages: { NotificationsRead: messageRef('NotificationsRead') },
+      'x-socketio-room': { name: USER_ROOM, effect: 'emit' },
+    },
     channelJoin: {
       address: received(SOCKET_EVENTS.CHANNEL_JOIN),
       title: 'Join a channel room',
@@ -362,6 +382,21 @@ export const asyncApiDocument = {
         channelMessageRef('directMessageDeleted', 'DirectMessageDeleted'),
       ],
     },
+    publishDirectMessageRead: {
+      action: 'send',
+      channel: channelRef('directMessageRead'),
+      messages: [channelMessageRef('directMessageRead', 'DirectMessageRead')],
+    },
+    publishMessageRead: {
+      action: 'send',
+      channel: channelRef('messageRead'),
+      messages: [channelMessageRef('messageRead', 'MessageRead')],
+    },
+    publishNotificationsRead: {
+      action: 'send',
+      channel: channelRef('notificationsRead'),
+      messages: [channelMessageRef('notificationsRead', 'NotificationsRead')],
+    },
     joinChannel: {
       action: 'receive',
       channel: channelRef('channelJoin'),
@@ -463,6 +498,18 @@ export const asyncApiDocument = {
       DirectMessageDeleted: {
         name: SOCKET_EVENTS.DIRECT_MESSAGE_DELETED,
         payload: schemaRef('DirectMessageDeletedPayload'),
+      },
+      DirectMessageRead: {
+        name: SOCKET_EVENTS.DIRECT_MESSAGE_READ,
+        payload: schemaRef('DirectReadPayload'),
+      },
+      MessageRead: {
+        name: SOCKET_EVENTS.MESSAGE_READ,
+        payload: schemaRef('ChannelReadPayload'),
+      },
+      NotificationsRead: {
+        name: SOCKET_EVENTS.NOTIFICATIONS_READ,
+        payload: schemaRef('NotificationsReadPayload'),
       },
       ChannelJoin: {
         name: SOCKET_EVENTS.CHANNEL_JOIN,
@@ -602,6 +649,54 @@ export const asyncApiDocument = {
       },
     },
     schemas: {
+      DirectReadPayload: {
+        type: 'object',
+        required: [
+          'workspaceId',
+          'conversationId',
+          'readerId',
+          'lastReadMessageId',
+          'lastReadCreatedAt',
+          'lastReadAt',
+        ],
+        properties: {
+          workspaceId: uuid('Workspace id.'),
+          conversationId: uuid('Conversation id.'),
+          readerId: uuid('Reader id.'),
+          lastReadMessageId: uuid('Boundary message id.'),
+          lastReadCreatedAt: { type: 'string', format: 'date-time' },
+          lastReadAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      ChannelReadPayload: {
+        type: 'object',
+        required: [
+          'workspaceId',
+          'channelId',
+          'reader',
+          'lastReadMessageId',
+          'lastReadCreatedAt',
+        ],
+        properties: {
+          workspaceId: uuid('Workspace id.'),
+          channelId: uuid('Channel id.'),
+          reader: schemaRef('MessageAuthor'),
+          lastReadMessageId: uuid('Boundary message id.'),
+          lastReadCreatedAt: { type: 'string', format: 'date-time' },
+        },
+      },
+      NotificationsReadPayload: {
+        type: 'object',
+        required: ['userId', 'notificationIds', 'unreadCount'],
+        properties: {
+          userId: uuid('Notification owner.'),
+          notificationIds: {
+            type: 'array',
+            items: uuid('Read notification id.'),
+          },
+          unreadCount: { type: 'integer', minimum: 0 },
+        },
+      },
       ConversationSubscription: {
         type: 'object',
         required: ['workspaceId', 'conversationId'],

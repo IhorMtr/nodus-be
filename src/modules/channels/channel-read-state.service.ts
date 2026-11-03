@@ -26,7 +26,11 @@ async function markRead(
   userId: string,
   channelId: string,
   messageId: string
-): Promise<PublicChannelReadState> {
+): Promise<{
+  state: PublicChannelReadState;
+  advanced: boolean;
+  createdAt: string;
+}> {
   await requireWorkspaceMember(workspaceId, userId);
   await requireChannel(workspaceId, channelId);
   const message = await messageRepository.findMessage(channelId, messageId);
@@ -38,11 +42,21 @@ async function markRead(
     channelId,
     messageId
   );
-  if (advanced) return toPublicReadState(advanced);
+  if (advanced)
+    return {
+      state: toPublicReadState(advanced),
+      advanced: true,
+      createdAt: advanced.lastReadCreatedAt.toISOString(),
+    };
 
   // A repeated or older boundary leaves the stored position unchanged.
   const current = await channelReadStateRepository.find(userId, channelId);
-  if (current) return toPublicReadState(current);
+  if (current)
+    return {
+      state: toPublicReadState(current),
+      advanced: false,
+      createdAt: current.lastReadCreatedAt.toISOString(),
+    };
   await requireWorkspaceMember(workspaceId, userId);
   await requireChannel(workspaceId, channelId);
   throw channelErrors.notFound();

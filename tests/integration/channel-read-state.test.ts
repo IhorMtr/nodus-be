@@ -44,6 +44,71 @@ afterAll(async () => prisma.$disconnect());
 // ==================== READ STATE ====================
 
 describe('channel read state', () => {
+  it('returns reader names and counts without counting the author', async () => {
+    const [owner, first, second] = await Promise.all([
+      createUser(),
+      createUser(),
+      createUser(),
+    ]);
+    const workspace = await request(app)
+      .post('/workspaces')
+      .set(authorization(owner.accessToken))
+      .send({ name: 'Receipts' });
+    const workspaceId = workspace.body.data.id as string;
+    const users = await prisma.user.findMany({
+      where: { email: { in: [first.email, second.email] } },
+      select: { id: true },
+    });
+    await prisma.workspaceMember.createMany({
+      data: users.map(user => ({ workspaceId, userId: user.id })),
+    });
+    const channelsUrl = `/workspaces/${workspaceId}/channels`;
+    const channels = await request(app)
+      .get(channelsUrl)
+      .set(authorization(owner.accessToken));
+    const channelId = channels.body.data[0].id as string;
+    const messagesUrl = `${channelsUrl}/${channelId}/messages`;
+    const sent = await request(app)
+      .post(messagesUrl)
+      .set(authorization(owner.accessToken))
+      .send({ content: 'Receipt target' });
+    const messageId = sent.body.data.id as string;
+    const history = async () =>
+      (
+        await request(app)
+          .get(messagesUrl)
+          .set(authorization(owner.accessToken))
+      ).body.data.items[0].receipt as {
+        read: boolean;
+        readerCount: number;
+        readers: { id: string }[];
+      };
+    expect(await history()).toMatchObject({
+      read: false,
+      readerCount: 0,
+      readers: [],
+    });
+    await request(app)
+      .put(`${channelsUrl}/${channelId}/read-state`)
+      .set(authorization(owner.accessToken))
+      .send({ lastReadMessageId: messageId });
+    expect((await history()).readerCount).toBe(0);
+    await request(app)
+      .put(`${channelsUrl}/${channelId}/read-state`)
+      .set(authorization(first.accessToken))
+      .send({ lastReadMessageId: messageId });
+    expect(await history()).toMatchObject({ read: true, readerCount: 1 });
+    await request(app)
+      .put(`${channelsUrl}/${channelId}/read-state`)
+      .set(authorization(second.accessToken))
+      .send({ lastReadMessageId: messageId });
+    const receipt = await history();
+    expect(receipt.readerCount).toBe(2);
+    expect(receipt.readers.map(reader => reader.id).sort()).toEqual(
+      users.map(user => user.id).sort()
+    );
+  });
+
   it('uses message IDs to break equal timestamp ties', async () => {
     const user = await createUser();
     const created = await request(app)
@@ -80,7 +145,7 @@ describe('channel read state', () => {
       .get(channelsUrl)
       .set(authorization(user.accessToken));
     expect((after.body as { data: ChannelData[] }).data[0]!.unreadCount).toBe(
-      1
+      0
     );
     const advanced = await request(app)
       .put(`${channelsUrl}/${channelId}/read-state`)
@@ -146,14 +211,14 @@ describe('channel read state', () => {
 
     const first = await send(owner.accessToken, 'first');
     const second = await send(owner.accessToken, 'second');
-    expect(await count(owner.accessToken)).toBe(2);
+    expect(await count(owner.accessToken)).toBe(0);
     expect(await count(member.accessToken)).toBe(2);
     const marked = await mark(owner.accessToken, first);
     expect(marked.status).toBe(200);
     expect((marked.body as { data: StateData }).data.lastReadMessageId).toBe(
       first
     );
-    expect(await count(owner.accessToken)).toBe(1);
+    expect(await count(owner.accessToken)).toBe(0);
     expect((await mark(owner.accessToken, first)).body).toEqual(marked.body);
     const newer = await mark(owner.accessToken, second);
     expect(newer.status).toBe(200);

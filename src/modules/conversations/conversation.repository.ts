@@ -100,6 +100,19 @@ function members(workspaceId: string, userIds: string[]) {
   });
 }
 
+async function activeParticipants(workspaceId: string, conversationId: string) {
+  const record = await prisma.conversation.findUnique({
+    where: { id: conversationId, workspaceId },
+    select: { firstUserId: true, secondUserId: true },
+  });
+  if (!record) return [];
+  const rows = await members(workspaceId, [
+    record.firstUserId,
+    record.secondUserId,
+  ]);
+  return rows.map(row => row.userId);
+}
+
 // ==================== MESSAGES ====================
 
 function findMessage(conversationId: string, id: string) {
@@ -231,9 +244,10 @@ async function advanceRead(
   conversationId: string,
   messageId: string
 ) {
-  const rows = await prisma.$queryRaw<
-    { lastReadMessageId: string; lastReadAt: Date }[]
-  >`
+  return prisma.$transaction(async tx => {
+    const rows = await tx.$queryRaw<
+      { lastReadMessageId: string; lastReadCreatedAt: Date; lastReadAt: Date }[]
+    >`
     INSERT INTO "ConversationReadState" ("userId", "workspaceId", "conversationId", "lastReadMessageId", "lastReadCreatedAt", "lastReadAt", "updatedAt")
     SELECT ${userId}::uuid, ${workspaceId}::uuid, c.id, m.id, m."createdAt", CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
     FROM "Conversation" c
@@ -247,9 +261,28 @@ async function advanceRead(
       "lastReadAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
     WHERE ("ConversationReadState"."lastReadCreatedAt", "ConversationReadState"."lastReadMessageId")
       < (EXCLUDED."lastReadCreatedAt", EXCLUDED."lastReadMessageId")
-    RETURNING "lastReadMessageId", "lastReadAt"
+    RETURNING "lastReadMessageId", "lastReadCreatedAt", "lastReadAt"
   `;
-  return rows[0] ?? null;
+    const state = rows[0];
+    if (!state) return null;
+    const notifications = await tx.$queryRaw<{ id: string }[]>`
+    UPDATE "Notification" n SET "readAt" = CURRENT_TIMESTAMP
+    FROM "DirectMessage" m
+    WHERE n."userId" = ${userId}::uuid AND n."workspaceId" = ${workspaceId}::uuid
+      AND n.type = 'DirectMessageCreated' AND n."readAt" IS NULL
+      AND n."entityId" = m.id AND m."conversationId" = ${conversationId}::uuid
+      AND (m."createdAt", m.id) <= (${state.lastReadCreatedAt}, ${state.lastReadMessageId}::uuid)
+    RETURNING n.id
+  `;
+    const unreadCount = await tx.notification.count({
+      where: { userId, readAt: null },
+    });
+    return {
+      state,
+      notificationIds: notifications.map(notification => notification.id),
+      unreadCount,
+    };
+  });
 }
 
 async function countUnread(workspaceId: string, userId: string) {
@@ -278,6 +311,7 @@ export const conversationRepository = {
   createPair,
   list,
   members,
+  activeParticipants,
   findMessage,
   listMessages,
   createMessage,

@@ -333,7 +333,7 @@ export const channelPaths: OpenAPIV3.PathsObject = {
       operationId: 'markChannelRead',
       summary: 'Mark a channel read through a message',
       description:
-        'Available to workspace members for their own read state. The message must belong to the channel in the URL. The stored boundary advances in message history order (createdAt, id); older or repeated marks return the current state without moving it backwards. A deleted boundary message does not reset the position. No state exists for an empty channel until a message is marked read.',
+        'Available to workspace members for their own read state. The message must belong to the channel in the URL. The stored boundary advances in message history order (createdAt, id); older or repeated marks return the current state without moving it backwards. An advance emits message:read with the reader and boundary to active workspace members. The author is excluded from the message’s readers. A deleted boundary message does not reset the position. No state exists for an empty channel until a message is marked read.',
       requestBody: requestBody('MarkChannelReadRequest'),
       responses: {
         ...authenticatedResponses,

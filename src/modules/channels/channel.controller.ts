@@ -4,6 +4,9 @@ import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
 import { channelService } from './channel.service.js';
 import { channelReadStateService } from './channel-read-state.service.js';
+import { notificationBridge } from '../../socket/notification.bridge.js';
+import { socketPublisher } from '../../socket/socket.publisher.js';
+import { channelReadStateRepository } from './channel-read-state.repository.js';
 import type {
   ChannelParams,
   ChannelWorkspaceParams,
@@ -100,5 +103,30 @@ export const markChannelRead: RequestHandler<
     req.params.channelId,
     req.body.lastReadMessageId
   );
-  res.json(successResponse(state));
+  if (state.advanced) {
+    const reader = await channelReadStateRepository.reader(
+      authenticatedUserId(req)
+    );
+    if (reader) {
+      const payload = {
+        workspaceId: req.params.workspaceId,
+        channelId: req.params.channelId,
+        reader,
+        lastReadMessageId: state.state.lastReadMessageId,
+        lastReadCreatedAt: state.createdAt,
+      };
+      const recipientIds = await channelReadStateRepository.memberIds(
+        req.params.workspaceId
+      );
+      if (recipientIds.includes(authenticatedUserId(req))) {
+        socketPublisher.publishChannelRead(payload, recipientIds);
+        void notificationBridge.publishDirect({
+          kind: 'channel-read',
+          payload,
+          recipientIds,
+        });
+      }
+    }
+  }
+  res.json(successResponse(state.state));
 };

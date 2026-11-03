@@ -4,6 +4,11 @@ import type { PublicDirectMessage } from '../modules/conversations/conversation.
 import type { PublicNotification } from '../modules/notifications/notification.types.js';
 import { redis } from '../redis/client.js';
 import { socketPublisher } from './socket.publisher.js';
+import type {
+  DirectReadPayload,
+  ChannelReadPayload,
+  NotificationsReadPayload,
+} from './socket.types.js';
 
 // ==================== TRANSPORT ====================
 
@@ -27,6 +32,23 @@ type DirectTransport =
       kind: 'direct-notification';
       origin: string;
       notification: PublicNotification;
+    }
+  | {
+      kind: 'direct-read';
+      origin: string;
+      payload: DirectReadPayload;
+      recipientIds: string[];
+    }
+  | {
+      kind: 'channel-read';
+      origin: string;
+      payload: ChannelReadPayload;
+      recipientIds: string[];
+    }
+  | {
+      kind: 'notifications-read';
+      origin: string;
+      payload: NotificationsReadPayload;
     }
   | {
       kind: 'workspace-revoked';
@@ -78,6 +100,21 @@ class NotificationBridge {
               break;
             case 'direct-notification':
               socketPublisher.publishNotificationCreated(data.notification);
+              break;
+            case 'direct-read':
+              socketPublisher.publishDirectRead(
+                data.payload,
+                data.recipientIds
+              );
+              break;
+            case 'channel-read':
+              socketPublisher.publishChannelRead(
+                data.payload,
+                data.recipientIds
+              );
+              break;
+            case 'notifications-read':
+              socketPublisher.publishNotificationsRead(data.payload);
               break;
             case 'workspace-revoked':
               void socketPublisher.revokeWorkspaceAccess(

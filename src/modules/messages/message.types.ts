@@ -29,6 +29,11 @@ export type PublicMessage = {
   content: string;
   createdAt: string;
   updatedAt: string;
+  receipt?: {
+    read: boolean;
+    readerCount: number;
+    readers: { id: string; firstName: string; lastName: string }[];
+  };
 };
 
 export type MessageHistory = {

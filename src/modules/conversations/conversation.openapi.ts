@@ -44,6 +44,11 @@ export const conversationSchemas: Record<string, OpenAPIV3.SchemaObject> = {
       content: { type: 'string' },
       createdAt: dateTime,
       updatedAt: dateTime,
+      read: {
+        type: 'boolean',
+        description:
+          'Present in history responses for messages authored by the requester. True only when the other participant advanced their read boundary over this message.',
+      },
     },
   },
   Conversation: {
@@ -91,8 +96,12 @@ export const conversationSchemas: Record<string, OpenAPIV3.SchemaObject> = {
   },
   ConversationReadState: {
     type: 'object',
-    required: ['lastReadMessageId', 'lastReadAt'],
-    properties: { lastReadMessageId: uuid, lastReadAt: dateTime },
+    required: ['lastReadMessageId', 'lastReadCreatedAt', 'lastReadAt'],
+    properties: {
+      lastReadMessageId: uuid,
+      lastReadCreatedAt: dateTime,
+      lastReadAt: dateTime,
+    },
   },
   ConversationResponse: envelope(ref('Conversation')),
   ConversationListResponse: envelope({
@@ -265,6 +274,8 @@ export const conversationPaths: OpenAPIV3.PathsObject = {
       security,
       operationId: 'markConversationRead',
       summary: 'Advance read position to an existing message',
+      description:
+        'Only a conversation participant who remains a workspace member can advance their own boundary. Repeated or older positions are safe. An advance marks only this conversation’s DirectMessageCreated notifications through the boundary as read and emits direct-message:read and notifications:read to active participants and the reader’s devices. Joining a Socket.IO room never marks messages read.',
       requestBody: {
         required: true,
         content: {

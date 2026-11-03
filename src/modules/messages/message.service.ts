@@ -1,5 +1,6 @@
 import { requireChannel } from '../channels/channel.service.js';
 import { requireWorkspaceMember } from '../workspaces/workspace.service.js';
+import { channelReadStateRepository } from '../channels/channel-read-state.repository.js';
 import { messageErrors } from './message.errors.js';
 import {
   isMessageNotFoundError,
@@ -98,7 +99,25 @@ async function listMessages(
   const oldest = page.at(-1);
   const nextCursor =
     messages.length > query.limit && oldest ? encodeCursor(oldest) : null;
-  return { items: page.reverse().map(toPublicMessage), nextCursor };
+  const readers = await channelReadStateRepository.receipts(
+    channelId,
+    page.map(message => message.id)
+  );
+  return {
+    items: page.reverse().map(message => {
+      const item = toPublicMessage(message);
+      const list = readers.get(item.id) ?? [];
+      return {
+        ...item,
+        receipt: {
+          read: list.length > 0,
+          readerCount: list.length,
+          readers: list,
+        },
+      };
+    }),
+    nextCursor,
+  };
 }
 
 async function updateMessage(
