@@ -12,7 +12,6 @@ import { router } from './routes/index.js';
 export const app = express();
 
 app.disable('x-powered-by');
-// req.ip, and with it the IP-based rate limits, skips exactly this many trusted proxy hops.
 app.set('trust proxy', env.TRUST_PROXY_HOPS);
 
 // ==================== HTTP MIDDLEWARE ====================

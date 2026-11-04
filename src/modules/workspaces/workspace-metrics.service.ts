@@ -15,7 +15,6 @@ const activityPeriodDays = {
   last30Days: 30,
 } as const satisfies Record<keyof WorkspaceMetrics['activity'], number>;
 
-// Periods are rolling windows ending at the request time, not calendar days.
 function periodStart(now: Date, days: number): Date {
   return new Date(now.getTime() - days * dayMs);
 }

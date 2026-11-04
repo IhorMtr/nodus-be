@@ -1,13 +1,13 @@
-import type { Request, RequestHandler } from 'express';
+import type { RequestHandler } from 'express';
 import type { Query } from 'express-serve-static-core';
-import { AppError } from '../../shared/errors/app-error.js';
+import { authenticatedUserId } from '../../middleware/auth.middleware.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
-import { socketPublisher } from '../../socket/socket.publisher.js';
+import { notificationBridge } from '../../socket/notification.bridge.js';
+import type { ChannelParams } from '../channels/channel.types.js';
 import { messageService } from './message.service.js';
 import type {
   CreateMessageInput,
-  MessageChannelParams,
   MessageContext,
   MessageHistory,
   MessageHistoryQuery,
@@ -16,33 +16,10 @@ import type {
   UpdateMessageInput,
 } from './message.types.js';
 
-// ==================== AUTH CONTEXT ====================
-
-function authenticatedUserId(req: Request): string {
-  if (!req.auth)
-    throw new AppError('Access token is required', 401, 'Unauthorized');
-  return req.auth.userId;
-}
-
-// ==================== MESSAGE LIFECYCLE ====================
-
-export const createMessage: RequestHandler<
-  MessageChannelParams,
-  ApiResponse<PublicMessage>,
-  CreateMessageInput
-> = async (req, res) => {
-  const message = await messageService.createMessage(
-    req.params.workspaceId,
-    authenticatedUserId(req),
-    req.params.channelId,
-    req.body
-  );
-  socketPublisher.publishMessageCreated(req.params.workspaceId, message);
-  res.status(201).json(successResponse(message));
-};
+// ==================== QUERIES ====================
 
 export const listMessages: RequestHandler<
-  MessageChannelParams,
+  ChannelParams,
   ApiResponse<MessageHistory>,
   unknown,
   Query,
@@ -70,19 +47,46 @@ export const getMessageContext: RequestHandler<
   res.json(successResponse(context));
 };
 
+// ==================== MUTATIONS ====================
+
+export const createMessage: RequestHandler<
+  ChannelParams,
+  ApiResponse<PublicMessage>,
+  CreateMessageInput
+> = async (req, res) => {
+  const { workspaceId } = req.params;
+  const message = await messageService.createMessage(
+    workspaceId,
+    authenticatedUserId(req),
+    req.params.channelId,
+    req.body
+  );
+  void notificationBridge.broadcast({
+    kind: 'message-created',
+    workspaceId,
+    message,
+  });
+  res.status(201).json(successResponse(message));
+};
+
 export const updateMessage: RequestHandler<
   MessageParams,
   ApiResponse<PublicMessage>,
   UpdateMessageInput
 > = async (req, res) => {
+  const { workspaceId } = req.params;
   const message = await messageService.updateMessage(
-    req.params.workspaceId,
+    workspaceId,
     authenticatedUserId(req),
     req.params.channelId,
     req.params.messageId,
     req.body
   );
-  socketPublisher.publishMessageUpdated(req.params.workspaceId, message);
+  void notificationBridge.broadcast({
+    kind: 'message-updated',
+    workspaceId,
+    message,
+  });
   res.json(successResponse(message));
 };
 
@@ -90,16 +94,18 @@ export const deleteMessage: RequestHandler<
   MessageParams,
   ApiResponse<null>
 > = async (req, res) => {
+  const { workspaceId, channelId, messageId } = req.params;
   await messageService.deleteMessage(
-    req.params.workspaceId,
+    workspaceId,
     authenticatedUserId(req),
-    req.params.channelId,
-    req.params.messageId
+    channelId,
+    messageId
   );
-  socketPublisher.publishMessageDeleted(
-    req.params.workspaceId,
-    req.params.channelId,
-    req.params.messageId
-  );
+  void notificationBridge.broadcast({
+    kind: 'message-deleted',
+    workspaceId,
+    channelId,
+    messageId,
+  });
   res.json(successResponse(null));
 };

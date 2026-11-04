@@ -6,8 +6,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 async function loadApp(hops: string | undefined): Promise<Express> {
   vi.resetModules();
-  if (hops === undefined) delete process.env['TRUST_PROXY_HOPS'];
-  else process.env['TRUST_PROXY_HOPS'] = hops;
+  if (hops === undefined) {
+    delete process.env['TRUST_PROXY_HOPS'];
+  } else {
+    process.env['TRUST_PROXY_HOPS'] = hops;
+  }
   return (await import('../../src/app.js')).app;
 }
 
@@ -19,7 +22,9 @@ async function remaining(app: Express, forwardedFor: string): Promise<number> {
   expect(response.status).toBe(400);
   const header = response.get('RateLimit') ?? '';
   const match = /r=(\d+)/.exec(header);
-  if (!match) throw new Error(`Missing RateLimit header: ${header}`);
+  if (!match) {
+    throw new Error(`Missing RateLimit header: ${header}`);
+  }
   return Number(match[1]);
 }
 

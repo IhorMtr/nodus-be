@@ -8,7 +8,12 @@ import {
   announcementJobId,
 } from '../../src/queues/announcement.queue.js';
 import { closeRedis } from '../../src/redis/client.js';
-import { authorization, createUser, testEmailPrefix } from './helpers.js';
+import {
+  authorization,
+  createUser,
+  testEmailPrefix,
+  assertTestDatabase,
+} from './helpers.js';
 
 // ==================== TYPES ====================
 
@@ -39,18 +44,16 @@ async function workspace(token: string) {
 // ==================== SETUP ====================
 
 beforeAll(async () => {
-  const name = process.env.DATABASE_URL
-    ? (new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0] ?? '')
-    : '';
-  if (!name.endsWith('_test'))
-    throw new Error('Integration tests require a database ending in _test');
+  assertTestDatabase();
   await prisma.$connect();
 });
 
 afterEach(async () => {
   for (const id of createdJobs) {
     const job = await announcementQueue.getJob(id);
-    if (job) await job.remove();
+    if (job) {
+      await job.remove();
+    }
   }
   createdJobs.clear();
   const users = await prisma.user.findMany({

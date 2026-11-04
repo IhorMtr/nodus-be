@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { rateLimit } from 'express-rate-limit';
 import { validateBody } from '../../middleware/validation.middleware.js';
+import { noStore } from '../../middleware/no-store.middleware.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import {
   LOGIN_LIMIT,
@@ -17,32 +18,25 @@ import {
 
 // ==================== RATE LIMITS ====================
 
-export const registerRateLimiter = rateLimit({
-  windowMs: REGISTER_WINDOW_MS,
-  limit: REGISTER_LIMIT,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  handler: (_req, _res, next) =>
-    next(new AppError('Too many requests', 429, 'TooManyRequests')),
-});
+function rateLimiter(windowMs: number, limit: number) {
+  return rateLimit({
+    windowMs,
+    limit,
+    standardHeaders: 'draft-8',
+    legacyHeaders: false,
+    handler: (_req, _res, next) =>
+      next(new AppError('Too many requests', 429, 'TooManyRequests')),
+  });
+}
 
-export const loginRateLimiter = rateLimit({
-  windowMs: LOGIN_WINDOW_MS,
-  limit: LOGIN_LIMIT,
-  standardHeaders: 'draft-8',
-  legacyHeaders: false,
-  handler: (_req, _res, next) =>
-    next(new AppError('Too many requests', 429, 'TooManyRequests')),
-});
+const registerRateLimiter = rateLimiter(REGISTER_WINDOW_MS, REGISTER_LIMIT);
+const loginRateLimiter = rateLimiter(LOGIN_WINDOW_MS, LOGIN_LIMIT);
 
 // ==================== ROUTES ====================
 
 export const authRouter = Router();
 
-authRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+authRouter.use(noStore);
 authRouter.post(
   '/register',
   registerRateLimiter,

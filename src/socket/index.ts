@@ -39,7 +39,6 @@ export function initializeSocket(httpServer: HttpServer): SocketServer {
     const { userId } = socket.data;
     logger.info({ socketId: socket.id, userId }, 'Socket connected');
 
-    // The default in-memory adapter joins synchronously, before any client event is handled.
     void socket.join(userRoom(userId));
     registerChannelHandlers(socket);
     registerConversationHandlers(socket);

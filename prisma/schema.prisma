@@ -106,7 +106,6 @@ model Channel {
   workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   messages    Message[]
   readStates  ChannelReadState[]
-  // An expression unique index in add_channels enforces workspaceId + lower(name).
 
   @@unique([id, workspaceId])
   @@index([workspaceId, createdAt, id])
@@ -121,7 +120,6 @@ model Message {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
   channel   Channel  @relation(fields: [channelId], references: [id], onDelete: Cascade)
   author    User     @relation(fields: [authorId], references: [id], onDelete: Restrict)
-  // A GIN trigram index in add_message_search_index supports case-insensitive substring search.
 
   @@index([channelId, createdAt(sort: Desc), id(sort: Desc)])
 }
@@ -131,7 +129,6 @@ model ChannelReadState {
   workspaceId       String          @db.Uuid
   channelId         String          @db.Uuid
   lastReadMessageId String          @db.Uuid
-  // The message ID is a durable cursor tie-breaker, not a foreign key; deleted messages must not reset read progress.
   lastReadCreatedAt DateTime        @db.Timestamptz(3)
   lastReadAt        DateTime        @default(now()) @db.Timestamptz(3)
   updatedAt         DateTime        @updatedAt @db.Timestamptz(3)
@@ -152,7 +149,6 @@ model WorkspaceMember {
   user                   User                    @relation(fields: [userId], references: [id], onDelete: Restrict)
   channelReadStates      ChannelReadState[]
   conversationReadStates ConversationReadState[]
-  // A partial unique index in add_workspaces enforces at most one Owner per workspace.
 
   @@id([workspaceId, userId])
   @@index([userId])
@@ -171,7 +167,6 @@ model Conversation {
   messages     DirectMessage[]
   readStates   ConversationReadState[]
 
-  // The unique index below also serves lookups by workspaceId + firstUserId.
   @@unique([workspaceId, firstUserId, secondUserId])
   @@unique([id, workspaceId])
   @@index([workspaceId, secondUserId])

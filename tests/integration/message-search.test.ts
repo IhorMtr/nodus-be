@@ -2,7 +2,12 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import request from 'supertest';
 import { app } from '../../src/app.js';
 import { prisma } from '../../src/database/client.js';
-import { authorization, createUser, testEmailPrefix } from './helpers.js';
+import {
+  authorization,
+  createUser,
+  testEmailPrefix,
+  assertTestDatabase,
+} from './helpers.js';
 
 // ==================== TYPES ====================
 
@@ -20,11 +25,7 @@ type SearchBody = {
 // ==================== DATABASE LIFECYCLE ====================
 
 beforeAll(async () => {
-  const databaseName = process.env.DATABASE_URL
-    ? (new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0] ?? '')
-    : '';
-  if (!databaseName.endsWith('_test'))
-    throw new Error('Test database required');
+  assertTestDatabase();
   await prisma.$connect();
 });
 

@@ -8,6 +8,7 @@ import {
   createUser,
   testEmailPrefix,
   type TestUser,
+  assertTestDatabase,
 } from './helpers.js';
 
 // ==================== TYPES ====================
@@ -131,11 +132,7 @@ async function metrics(
 // ==================== DATABASE LIFECYCLE ====================
 
 beforeAll(async () => {
-  const name = process.env.DATABASE_URL
-    ? (new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0] ?? '')
-    : '';
-  if (!name.endsWith('_test'))
-    throw new Error('Integration tests require a database ending in _test');
+  assertTestDatabase();
   await prisma.$connect();
 });
 
@@ -199,8 +196,6 @@ describe('workspace metrics', () => {
       30 * dayMs
     );
 
-    // Admin may read metrics; Member is denied and outsiders see WorkspaceNotFound.
-
     const adminMetrics = await metrics(workspaceId, admin.accessToken);
     expect(adminMetrics.totals.members).toBe(3);
 
@@ -253,7 +248,6 @@ describe('workspace metrics', () => {
     expect(second.status).toBe(201);
     const secondId = (second.body as Body<{ id: string }>).data.id;
 
-    // Member: several actions in 7 days must still count as one active member.
     const memberRecent = [
       await sendMessage(workspaceId, generalId, member, 'recent one'),
       await sendMessage(workspaceId, secondId, member, 'recent two'),
@@ -265,9 +259,7 @@ describe('workspace metrics', () => {
       member,
       'recent direct'
     );
-    // Owner: active only within 30 days.
     const ownerMid = await sendMessage(workspaceId, generalId, owner, 'mid');
-    // Quiet: activity only outside both windows.
     const quietOld = await sendMessage(workspaceId, generalId, quiet, 'old');
     const quietOldDirect = await sendDirectMessage(
       workspaceId,
@@ -275,7 +267,6 @@ describe('workspace metrics', () => {
       quiet,
       'old direct'
     );
-    // Admin: active in 7 days through an announcement only.
     await publishAnnouncement(workspaceId, admin);
     await prisma.announcement.createMany({
       data: [
@@ -297,7 +288,6 @@ describe('workspace metrics', () => {
         },
       ],
     });
-    // Former member: recent message stays in totals, but they are not an active member.
     await sendMessage(workspaceId, generalId, former, 'before removal');
     const removed = await request(app)
       .delete(`/workspaces/${workspaceId}/members/${await userId(former)}`)
@@ -325,7 +315,6 @@ describe('workspace metrics', () => {
       data: { createdAt: daysAgo(31) },
     });
 
-    // Recent activity of quiet in another workspace must not leak into these metrics.
     const otherId = await createWorkspace(quiet);
     await addMember(otherId, member, 'Member');
     const otherGeneral = await generalChannelId(otherId);

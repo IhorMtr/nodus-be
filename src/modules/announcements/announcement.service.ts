@@ -1,29 +1,37 @@
 import { logger } from '../../config/logger.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 import {
   enqueueAnnouncement,
   removeAnnouncementJob,
 } from '../../queues/announcement.queue.js';
+import { toPublicNotification } from '../notifications/notification.service.js';
+import type { PublicNotification } from '../notifications/notification.types.js';
 import {
   requireWorkspaceMember,
   requireWorkspaceRole,
 } from '../workspaces/workspace.service.js';
 import { announcementErrors } from './announcement.errors.js';
 import { announcementRepository } from './announcement.repository.js';
-import { socketPublisher } from '../../socket/socket.publisher.js';
-import { toPublicNotification } from '../notifications/notification.service.js';
 import type {
   CreateAnnouncementInput,
   PublicAnnouncement,
   UpdateAnnouncementInput,
 } from './announcement.types.js';
 
-// ==================== TYPES AND HELPERS ====================
+// ==================== TYPES ====================
 
 type AnnouncementRecord = NonNullable<
   Awaited<ReturnType<typeof announcementRepository.find>>
 >;
 
-function publicAnnouncement(record: AnnouncementRecord): PublicAnnouncement {
+type AnnouncementChange = {
+  announcement: PublicAnnouncement;
+  notifications: PublicNotification[];
+};
+
+// ==================== PUBLIC DATA ====================
+
+function toPublicAnnouncement(record: AnnouncementRecord): PublicAnnouncement {
   return {
     id: record.id,
     workspaceId: record.workspaceId,
@@ -37,14 +45,20 @@ function publicAnnouncement(record: AnnouncementRecord): PublicAnnouncement {
   };
 }
 
+// ==================== VALIDATION ====================
+
 function assertFuture(date: Date) {
-  if (date.getTime() <= Date.now()) throw announcementErrors.invalidPublishAt();
+  if (date.getTime() <= Date.now()) {
+    throw announcementErrors.invalidPublishAt();
+  }
 }
 
 // ==================== SCHEDULING ====================
 
 async function schedule(record: AnnouncementRecord) {
-  if (!record.publishAt || record.publishedAt) return;
+  if (!record.publishAt || record.publishedAt) {
+    return;
+  }
   try {
     await enqueueAnnouncement(
       record.id,
@@ -52,7 +66,6 @@ async function schedule(record: AnnouncementRecord) {
       record.publishAt
     );
   } catch (error) {
-    // The worker reconciles pending database rows after Redis recovers.
     logger.error(
       { err: error, announcementId: record.id },
       'Failed to enqueue announcement; worker reconciliation will retry'
@@ -64,7 +77,6 @@ async function unschedule(id: string, version: number) {
   try {
     await removeAnnouncementJob(id, version);
   } catch (error) {
-    // Version checks make a stale job harmless even when removal fails.
     logger.warn(
       { err: error, announcementId: id },
       'Failed to remove stale announcement job'
@@ -72,46 +84,18 @@ async function unschedule(id: string, version: number) {
   }
 }
 
-// ==================== ANNOUNCEMENTS ====================
-
-async function create(
-  workspaceId: string,
-  userId: string,
-  input: CreateAnnouncementInput
-): Promise<PublicAnnouncement> {
-  await requireWorkspaceRole(workspaceId, userId, ['Owner', 'Admin']);
-  if (input.publishAt) assertFuture(input.publishAt);
-  let record: AnnouncementRecord;
-  try {
-    const created = await announcementRepository.create(
-      workspaceId,
-      userId,
-      input.title,
-      input.content,
-      input.publishAt ?? null
-    );
-    record = created.record;
-    for (const notification of created.notifications)
-      socketPublisher.publishNotificationCreated(
-        toPublicNotification(notification)
-      );
-  } catch (error) {
-    // A concurrent workspace deletion removes the membership before the insert.
-    await requireWorkspaceRole(workspaceId, userId, ['Owner', 'Admin']);
-    throw error;
-  }
-  await schedule(record);
-  return publicAnnouncement(record);
-}
+// ==================== QUERIES ====================
 
 async function list(
   workspaceId: string,
   userId: string
 ): Promise<PublicAnnouncement[]> {
   const membership = await requireWorkspaceMember(workspaceId, userId);
-  return (
-    await announcementRepository.list(workspaceId, membership.role !== 'Member')
-  ).map(publicAnnouncement);
+  const records = await announcementRepository.list(
+    workspaceId,
+    membership.role !== 'Member'
+  );
+  return records.map(toPublicAnnouncement);
 }
 
 async function get(
@@ -121,9 +105,44 @@ async function get(
 ): Promise<PublicAnnouncement> {
   const membership = await requireWorkspaceMember(workspaceId, userId);
   const record = await announcementRepository.find(workspaceId, id);
-  if (!record || (membership.role === 'Member' && !record.publishedAt))
+  const hiddenDraft = membership.role === 'Member' && !record?.publishedAt;
+  if (!record || hiddenDraft) {
     throw announcementErrors.notFound();
-  return publicAnnouncement(record);
+  }
+  return toPublicAnnouncement(record);
+}
+
+// ==================== MUTATIONS ====================
+
+async function create(
+  workspaceId: string,
+  userId: string,
+  input: CreateAnnouncementInput
+): Promise<AnnouncementChange> {
+  await requireWorkspaceRole(workspaceId, userId, ['Owner', 'Admin']);
+  if (input.publishAt) {
+    assertFuture(input.publishAt);
+  }
+
+  let created: Awaited<ReturnType<typeof announcementRepository.create>>;
+  try {
+    created = await announcementRepository.create(
+      workspaceId,
+      userId,
+      input.title,
+      input.content,
+      input.publishAt ?? null
+    );
+  } catch (error) {
+    await requireWorkspaceRole(workspaceId, userId, ['Owner', 'Admin']);
+    throw error;
+  }
+
+  await schedule(created.record);
+  return {
+    announcement: toPublicAnnouncement(created.record),
+    notifications: created.notifications.map(toPublicNotification),
+  };
 }
 
 async function update(
@@ -131,44 +150,55 @@ async function update(
   userId: string,
   id: string,
   input: UpdateAnnouncementInput
-): Promise<PublicAnnouncement> {
+): Promise<AnnouncementChange> {
   await requireWorkspaceRole(workspaceId, userId, ['Owner', 'Admin']);
   const current = await announcementRepository.find(workspaceId, id);
-  if (!current) throw announcementErrors.notFound();
-  if (input.publishAt && current.publishedAt)
+  if (!current) {
+    throw announcementErrors.notFound();
+  }
+  if (input.publishAt && current.publishedAt) {
     throw announcementErrors.alreadyPublished();
-  if (input.publishAt) assertFuture(input.publishAt);
-  const changesSchedule = input.publishAt !== undefined && !current.publishedAt;
+  }
+  if (input.publishAt) {
+    assertFuture(input.publishAt);
+  }
+
+  const data: Prisma.AnnouncementUpdateManyMutationInput = {};
+  if (input.title !== undefined) {
+    data.title = input.title;
+  }
+  if (input.content !== undefined) {
+    data.content = input.content;
+  }
+  const nextPublishAt = current.publishedAt ? undefined : input.publishAt;
+  const changesSchedule = nextPublishAt !== undefined;
+  if (nextPublishAt !== undefined) {
+    data.publishAt = nextPublishAt;
+    data.publishedAt = nextPublishAt === null ? new Date() : null;
+    data.scheduleVersion = { increment: 1 };
+  }
+
   const updated = await announcementRepository.update(
     workspaceId,
     id,
     current.scheduleVersion,
-    {
-      ...(input.title !== undefined ? { title: input.title } : {}),
-      ...(input.content !== undefined ? { content: input.content } : {}),
-      ...(changesSchedule
-        ? {
-            publishAt: input.publishAt!,
-            publishedAt: input.publishAt === null ? new Date() : null,
-            scheduleVersion: { increment: 1 },
-          }
-        : {}),
-    }
+    data
   );
   if (!updated) {
-    if (!(await announcementRepository.find(workspaceId, id)))
-      throw announcementErrors.notFound();
-    throw announcementErrors.conflict();
+    const exists = await announcementRepository.find(workspaceId, id);
+    throw exists
+      ? announcementErrors.conflict()
+      : announcementErrors.notFound();
   }
-  for (const notification of updated.notifications)
-    socketPublisher.publishNotificationCreated(
-      toPublicNotification(notification)
-    );
+
   if (changesSchedule) {
     await unschedule(id, current.scheduleVersion);
     await schedule(updated.record);
   }
-  return publicAnnouncement(updated.record);
+  return {
+    announcement: toPublicAnnouncement(updated.record),
+    notifications: updated.notifications.map(toPublicNotification),
+  };
 }
 
 async function remove(
@@ -178,9 +208,16 @@ async function remove(
 ): Promise<void> {
   await requireWorkspaceRole(workspaceId, userId, ['Owner', 'Admin']);
   const current = await announcementRepository.find(workspaceId, id);
-  if (!current || !(await announcementRepository.remove(workspaceId, id)))
+  if (!current) {
     throw announcementErrors.notFound();
-  if (!current.publishedAt) await unschedule(id, current.scheduleVersion);
+  }
+  const removed = await announcementRepository.remove(workspaceId, id);
+  if (!removed) {
+    throw announcementErrors.notFound();
+  }
+  if (!current.publishedAt) {
+    await unschedule(id, current.scheduleVersion);
+  }
 }
 
 // ==================== PUBLIC API ====================

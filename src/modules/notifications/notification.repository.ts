@@ -4,7 +4,7 @@ import type { NotificationListQuery } from './notification.types.js';
 
 // ==================== SELECTS ====================
 
-const select = {
+export const notificationSelect = {
   id: true,
   userId: true,
   workspaceId: true,
@@ -22,7 +22,7 @@ async function list(userId: string, { page, limit }: NotificationListQuery) {
   const [items, total] = await prisma.$transaction([
     prisma.notification.findMany({
       where: { userId },
-      select,
+      select: notificationSelect,
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       skip: (page - 1) * limit,
       take: limit,
@@ -45,7 +45,7 @@ async function markRead(userId: string, notificationId: string) {
   });
   return prisma.notification.findFirst({
     where: { id: notificationId, userId },
-    select,
+    select: notificationSelect,
   });
 }
 
@@ -60,7 +60,7 @@ function create(
   client: Prisma.TransactionClient,
   data: Prisma.NotificationUncheckedCreateInput
 ) {
-  return client.notification.create({ data, select });
+  return client.notification.create({ data, select: notificationSelect });
 }
 
 async function createForAnnouncement(
@@ -79,7 +79,9 @@ async function createForAnnouncement(
     },
     select: { userId: true },
   });
-  if (members.length === 0) return [];
+  if (members.length === 0) {
+    return [];
+  }
   return client.notification.createManyAndReturn({
     data: members.map(member => ({
       userId: member.userId,
@@ -90,7 +92,7 @@ async function createForAnnouncement(
       message: announcement.title,
     })),
     skipDuplicates: true,
-    select,
+    select: notificationSelect,
   });
 }
 

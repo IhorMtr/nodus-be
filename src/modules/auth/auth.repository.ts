@@ -1,7 +1,5 @@
-import { z } from 'zod';
-
 import { prisma } from '../../database/client.js';
-import { Prisma } from '../../generated/prisma/client.js';
+import { uniqueViolationTargets } from '../../database/errors.js';
 import type { RegisterInput } from './auth.types.js';
 
 // ==================== TYPES ====================
@@ -36,7 +34,6 @@ function findUserByEmail(email: string) {
 }
 
 function createUserWithSession(user: NewUser, session: NewSession) {
-  // A nested write commits the user and its initial session together.
   return prisma.user.create({
     data: {
       ...user,
@@ -67,7 +64,6 @@ function findSessionById(id: string) {
 }
 
 async function rotateSessionToken(rotation: SessionRotation): Promise<boolean> {
-  // PostgreSQL rechecks this condition after acquiring the row lock.
   const result = await prisma.authSession.updateMany({
     where: {
       id: rotation.id,
@@ -96,35 +92,8 @@ async function revokeSessionByTokenHash(
 // ==================== PUBLIC API ====================
 
 export function isUniqueEmailError(error: unknown): boolean {
-  if (
-    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-    error.code !== 'P2002'
-  ) {
-    return false;
-  }
-  const target: unknown = error.meta?.['target'];
-  if (Array.isArray(target) && target.includes('email')) {
-    return true;
-  }
-
-  // Prisma's PostgreSQL driver adapter reports the database constraint name.
-  const adapterError = z
-    .object({
-      cause: z.object({
-        kind: z.literal('UniqueConstraintViolation'),
-        constraint: z.object({
-          index: z.string().optional(),
-          fields: z.array(z.string()).optional(),
-        }),
-      }),
-    })
-    .safeParse(error.meta?.['driverAdapterError']);
-
-  return (
-    adapterError.success &&
-    (adapterError.data.cause.constraint.index === 'User_email_key' ||
-      adapterError.data.cause.constraint.fields?.includes('email') === true)
-  );
+  const targets = uniqueViolationTargets(error);
+  return targets.includes('email') || targets.includes('User_email_key');
 }
 
 export const authRepository = {

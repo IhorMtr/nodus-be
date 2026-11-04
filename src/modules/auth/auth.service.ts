@@ -13,19 +13,32 @@ import type { AuthTokens, LoginInput, RegisterInput } from './auth.types.js';
 
 // ==================== CONSTANTS ====================
 
-// A random, unused password with the same Argon2id cost as registered passwords.
 const DUMMY_PASSWORD_HASH =
   '$argon2id$v=19$m=19456,p=1,t=2$rkuphX00OTgLnhxhEKe35A$zrjqHEid7srprw5kD8Me8XdeuajBJ6j7ao7IXX3REzU';
+
+// ==================== ERRORS ====================
+
+function emailAlreadyExists(): AppError {
+  return new AppError(
+    'An account with this email already exists',
+    409,
+    'EmailAlreadyExists'
+  );
+}
+
+function refreshTokenReused(): AppError {
+  return new AppError(
+    'Refresh token has already been used',
+    401,
+    'RefreshTokenReused'
+  );
+}
 
 // ==================== AUTHENTICATION ====================
 
 async function register(input: RegisterInput): Promise<AuthTokens> {
   if (await authRepository.findUserByEmail(input.email)) {
-    throw new AppError(
-      'An account with this email already exists',
-      409,
-      'EmailAlreadyExists'
-    );
+    throw emailAlreadyExists();
   }
 
   const passwordHash = await hash(input.password, ARGON2_OPTIONS);
@@ -50,11 +63,7 @@ async function register(input: RegisterInput): Promise<AuthTokens> {
     );
   } catch (error) {
     if (isUniqueEmailError(error)) {
-      throw new AppError(
-        'An account with this email already exists',
-        409,
-        'EmailAlreadyExists'
-      );
+      throw emailAlreadyExists();
     }
     throw error;
   }
@@ -108,11 +117,7 @@ async function refresh(refreshToken: string): Promise<AuthTokens> {
 
   const previousTokenHash = fingerprintRefreshToken(refreshToken);
   if (session.refreshTokenHash !== previousTokenHash) {
-    throw new AppError(
-      'Refresh token has already been used',
-      401,
-      'RefreshTokenReused'
-    );
+    throw refreshTokenReused();
   }
 
   const pair = issueTokenPair(claims.userId, session.id);
@@ -126,18 +131,13 @@ async function refresh(refreshToken: string): Promise<AuthTokens> {
   });
 
   if (!rotated) {
-    throw new AppError(
-      'Refresh token has already been used',
-      401,
-      'RefreshTokenReused'
-    );
+    throw refreshTokenReused();
   }
 
   return pair.tokens;
 }
 
 async function logout(refreshToken: string): Promise<void> {
-  // The persisted fingerprint authenticates logout even after JWT expiration.
   await authRepository.revokeSessionByTokenHash(
     fingerprintRefreshToken(refreshToken)
   );

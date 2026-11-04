@@ -6,6 +6,7 @@ import { prisma } from './database/client.js';
 import { presenceService } from './modules/presence/presence.service.js';
 import { announcementQueue } from './queues/announcement.queue.js';
 import { closeRedis, redis } from './redis/client.js';
+import { closeStep } from './shared/utils/shutdown.js';
 import { initializeSocket } from './socket/index.js';
 import { notificationBridge } from './socket/notification.bridge.js';
 import { announcementWorker } from './workers/announcements.lifecycle.js';
@@ -19,7 +20,9 @@ let shuttingDown = false;
 // ==================== SHUTDOWN ====================
 
 async function shutdown(reason: string, exitCode = 0): Promise<void> {
-  if (shuttingDown) return;
+  if (shuttingDown) {
+    return;
+  }
   shuttingDown = true;
   logger.info({ reason }, 'Shutting down');
 
@@ -30,48 +33,19 @@ async function shutdown(reason: string, exitCode = 0): Promise<void> {
     process.exit(1);
   }, 10_000);
 
-  try {
-    // Socket.IO closes its clients and the attached HTTP server, draining requests.
-    await io.close();
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to close HTTP / Socket.IO');
+  const results = [
+    await closeStep('HTTP / Socket.IO', () => io.close()),
+    await closeStep('presence', () => presenceService.close()),
+    await closeStep('announcement worker', () => announcementWorker.close()),
+    await closeStep('announcement queue', () => announcementQueue.close()),
+    ...(await Promise.all([
+      closeStep('database', () => prisma.$disconnect()),
+      closeStep('Redis', closeRedis),
+      closeStep('realtime bridge', () => notificationBridge.close()),
+    ])),
+  ];
+  if (results.includes(false)) {
     exitCode = 1;
-  }
-  try {
-    await presenceService.close();
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to close presence');
-    exitCode = 1;
-  }
-
-  // Stop job processing before closing the queue and shared infrastructure.
-  try {
-    await announcementWorker.close();
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to close announcement worker');
-    exitCode = 1;
-  }
-
-  try {
-    await announcementQueue.close();
-  } catch (error) {
-    logger.error({ err: error }, 'Failed to close announcement queue');
-    exitCode = 1;
-  }
-
-  const infrastructure = await Promise.allSettled([
-    prisma.$disconnect(),
-    closeRedis(),
-    notificationBridge.close(),
-  ]);
-  for (const result of infrastructure) {
-    if (result.status === 'rejected') {
-      logger.error(
-        { err: result.reason },
-        'Failed to close an infrastructure connection'
-      );
-      exitCode = 1;
-    }
   }
 
   clearTimeout(deadline);
@@ -98,10 +72,12 @@ async function bootstrap(): Promise<void> {
   try {
     await notificationBridge.start();
   } catch (error) {
-    logger.error({ err: error }, 'Notification subscription unavailable');
+    logger.error({ err: error }, 'Realtime subscription unavailable');
   }
   await presenceService.start();
-  if (shuttingDown) return;
+  if (shuttingDown) {
+    return;
+  }
 
   httpServer.listen(env.PORT, () => {
     logger.info(
@@ -110,8 +86,7 @@ async function bootstrap(): Promise<void> {
     );
     void announcementWorker.start().catch((error: unknown) => {
       logger.error({ err: error }, 'Failed to start announcement worker');
-      if (!shuttingDown)
-        void shutdown('Announcement worker startup failure', 1);
+      void shutdown('Announcement worker startup failure', 1);
     });
   });
 }

@@ -42,7 +42,9 @@ async function markRead(
   notificationId: string
 ): Promise<PublicNotification> {
   const record = await notificationRepository.markRead(userId, notificationId);
-  if (!record) throw notificationErrors.notFound();
+  if (!record) {
+    throw notificationErrors.notFound();
+  }
   return toPublicNotification(record);
 }
 

@@ -4,6 +4,7 @@ import {
   validateBody,
   validateParams,
 } from '../../middleware/validation.middleware.js';
+import { noStore } from '../../middleware/no-store.middleware.js';
 import {
   createWorkspace,
   deleteWorkspace,
@@ -28,10 +29,7 @@ import {
 export const workspaceRouter = Router();
 
 workspaceRouter.use(authenticate);
-workspaceRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+workspaceRouter.use(noStore);
 
 // ==================== ROUTES ====================
 

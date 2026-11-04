@@ -32,18 +32,23 @@ class AnnouncementWorker {
 
   async #reconcile(): Promise<void> {
     for (const announcement of await announcementRepository.pending()) {
-      if (announcement.publishAt)
+      if (announcement.publishAt) {
         await enqueueAnnouncement(
           announcement.id,
           announcement.scheduleVersion,
           announcement.publishAt
         );
+      }
     }
   }
 
   #runReconciliation(): Promise<void> {
-    if (this.#stopping) return Promise.resolve();
-    if (this.#reconciliation) return this.#reconciliation;
+    if (this.#stopping) {
+      return Promise.resolve();
+    }
+    if (this.#reconciliation) {
+      return this.#reconciliation;
+    }
     this.#reconciliation = (async () => {
       try {
         await this.#reconcile();
@@ -70,8 +75,9 @@ class AnnouncementWorker {
     const worker = new Worker<PublishAnnouncementJob>(
       QUEUE_NAMES.announcements,
       async job => {
-        if (job.name !== 'publish')
+        if (job.name !== 'publish') {
           throw new Error(`Unknown announcement job: ${job.name}`);
+        }
         await publishAnnouncementJob(job.data);
       },
       { connection }
@@ -106,27 +112,40 @@ class AnnouncementWorker {
   // ==================== LIFECYCLE ====================
 
   async start(): Promise<void> {
-    if (this.#stopping) throw new Error('Announcement worker is shutting down');
+    if (this.#stopping) {
+      throw new Error('Announcement worker is shutting down');
+    }
     this.#started ??= this.#initialize();
     await this.#started;
   }
 
   close(): Promise<void> {
-    if (this.#closing) return this.#closing;
+    if (this.#closing) {
+      return this.#closing;
+    }
     this.#stopping = true;
     this.#closing = (async () => {
-      if (!this.#started) return;
+      if (!this.#started) {
+        return;
+      }
       let state: WorkerState;
       try {
         state = await this.#started;
       } catch {
         return;
       }
-      if (state.timer) clearInterval(state.timer);
-      if (this.#reconciliation) await this.#reconciliation;
+      if (state.timer) {
+        clearInterval(state.timer);
+      }
+      if (this.#reconciliation) {
+        await this.#reconciliation;
+      }
       await state.worker.close();
-      if (state.connection.status === 'ready') await state.connection.quit();
-      else state.connection.disconnect();
+      if (state.connection.status === 'ready') {
+        await state.connection.quit();
+      } else {
+        state.connection.disconnect();
+      }
       logger.info('Announcement worker stopped');
     })();
     return this.#closing;

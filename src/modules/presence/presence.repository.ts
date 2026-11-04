@@ -1,4 +1,5 @@
 import { prisma } from '../../database/client.js';
+import { isPrismaError } from '../../database/errors.js';
 import type { PresencePreference } from '../../generated/prisma/client.js';
 
 // ==================== QUERIES ====================
@@ -29,12 +30,22 @@ async function findVisibleUserIds(userId: string): Promise<string[]> {
 
 // ==================== MUTATIONS ====================
 
-function setPreference(userId: string, presencePreference: PresencePreference) {
-  return prisma.user.update({
-    where: { id: userId },
-    data: { presencePreference },
-    select: { presencePreference: true },
-  });
+async function setPreference(
+  userId: string,
+  presencePreference: PresencePreference
+) {
+  try {
+    return await prisma.user.update({
+      where: { id: userId },
+      data: { presencePreference },
+      select: { presencePreference: true },
+    });
+  } catch (error) {
+    if (isPrismaError(error, 'recordNotFound')) {
+      return null;
+    }
+    throw error;
+  }
 }
 
 // ==================== PUBLIC API ====================

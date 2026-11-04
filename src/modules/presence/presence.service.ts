@@ -1,9 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { logger } from '../../config/logger.js';
-import {
-  Prisma,
-  type PresencePreference,
-} from '../../generated/prisma/client.js';
+import type { PresencePreference } from '../../generated/prisma/client.js';
 import { redis } from '../../redis/client.js';
 import { AppError } from '../../shared/errors/app-error.js';
 import { socketPublisher } from '../../socket/socket.publisher.js';
@@ -15,6 +12,10 @@ export type PresenceStatus = 'online' | 'away' | 'dnd' | 'offline';
 export type PresenceUpdate = { userId: string; status: PresenceStatus };
 
 type TransportUpdate = PresenceUpdate & { origin: string };
+
+type PipelineResults = Awaited<
+  ReturnType<ReturnType<typeof redis.pipeline>['exec']>
+>;
 
 // ==================== CONSTANTS ====================
 
@@ -70,7 +71,25 @@ function toPreference(
   return (status[0]!.toUpperCase() + status.slice(1)) as PresencePreference;
 }
 
-// ==================== PRESENCE LIFECYCLE ====================
+function userNotFound(): AppError {
+  return new AppError('User not found', 404, 'UserNotFound');
+}
+
+function queueLivenessChecks(
+  pipeline: ReturnType<typeof redis.pipeline>,
+  userId: string
+): void {
+  pipeline.zcount(socketKey(userId), Date.now() + 1, '+inf');
+  pipeline.exists(graceKey(userId));
+}
+
+function isLive(results: PipelineResults, offset: number): boolean {
+  const leases = Number(results?.[offset]?.[1]);
+  const grace = Number(results?.[offset + 1]?.[1]);
+  return leases > 0 || grace > 0;
+}
+
+// ==================== PRESENCE SERVICE ====================
 
 class PresenceService {
   #origin = randomUUID();
@@ -80,8 +99,12 @@ class PresenceService {
   #refreshTimer: ReturnType<typeof setInterval> | undefined;
   #subscriber: ReturnType<typeof redis.duplicate> | undefined;
 
+  // ==================== LIFECYCLE ====================
+
   async start(): Promise<void> {
-    if (this.#subscriber) return;
+    if (this.#subscriber) {
+      return;
+    }
     const subscriber = redis.duplicate();
     subscriber.on('error', error =>
       logger.error({ err: error }, 'Presence subscription failed')
@@ -89,7 +112,9 @@ class PresenceService {
     subscriber.on('message', (_channel, message) => {
       try {
         const update = JSON.parse(message) as TransportUpdate;
-        if (update.origin !== this.#origin) void this.#deliver(update);
+        if (update.origin !== this.#origin) {
+          void this.#deliver(update);
+        }
       } catch (error) {
         logger.error({ err: error }, 'Invalid presence update');
       }
@@ -106,6 +131,27 @@ class PresenceService {
       throw error;
     }
   }
+
+  async close(): Promise<void> {
+    if (this.#refreshTimer) {
+      clearInterval(this.#refreshTimer);
+    }
+    this.#refreshTimer = undefined;
+    await Promise.all([...this.#sockets.keys()].map(id => this.disconnect(id)));
+    if (this.#pending.size > 0) {
+      await new Promise(resolve => setTimeout(resolve, disconnectGraceMs + 50));
+    }
+    await Promise.all(this.#offlineTasks);
+    const subscriber = this.#subscriber;
+    this.#subscriber = undefined;
+    if (subscriber?.status === 'ready') {
+      await subscriber.quit();
+    } else {
+      subscriber?.disconnect();
+    }
+  }
+
+  // ==================== CONNECTIONS ====================
 
   async connect(userId: string, socketId: string): Promise<void> {
     this.#sockets.set(socketId, userId);
@@ -129,11 +175,12 @@ class PresenceService {
       );
       if (Number(first) === 1) {
         const preference = await presenceRepository.findPreference(userId);
-        if (preference)
+        if (preference) {
           await this.#publish({
             userId,
             status: toStatus(preference.presencePreference),
           });
+        }
       }
     } catch (error) {
       logger.error({ err: error, userId }, 'Presence connect failed');
@@ -142,7 +189,9 @@ class PresenceService {
 
   async disconnect(socketId: string): Promise<void> {
     const userId = this.#sockets.get(socketId);
-    if (!userId) return;
+    if (!userId) {
+      return;
+    }
     this.#sockets.delete(socketId);
     try {
       await redis.eval(
@@ -153,7 +202,9 @@ class PresenceService {
         socketId,
         disconnectGraceMs
       );
-      if (this.#pending.has(userId)) return;
+      if (this.#pending.has(userId)) {
+        return;
+      }
       const timer = setTimeout(() => {
         this.#pending.delete(userId);
         const task = this.#markOffline(userId);
@@ -166,20 +217,6 @@ class PresenceService {
     }
   }
 
-  async close(): Promise<void> {
-    if (this.#refreshTimer) clearInterval(this.#refreshTimer);
-    this.#refreshTimer = undefined;
-    await Promise.all([...this.#sockets.keys()].map(id => this.disconnect(id)));
-    if (this.#pending.size > 0) {
-      await new Promise(resolve => setTimeout(resolve, disconnectGraceMs + 50));
-    }
-    await Promise.all(this.#offlineTasks);
-    const subscriber = this.#subscriber;
-    this.#subscriber = undefined;
-    if (subscriber?.status === 'ready') await subscriber.quit();
-    else subscriber?.disconnect();
-  }
-
   async #markOffline(userId: string): Promise<void> {
     try {
       const changed = await redis.eval(
@@ -189,8 +226,9 @@ class PresenceService {
         visibleKey(userId),
         Date.now()
       );
-      if (Number(changed) === 1)
+      if (Number(changed) === 1) {
         await this.#publish({ userId, status: 'offline' });
+      }
     } catch (error) {
       logger.error(
         { err: error, userId },
@@ -208,7 +246,9 @@ class PresenceService {
         pipeline.pexpire(socketKey(userId), leaseMs);
         pipeline.pexpire(visibleKey(userId), leaseMs);
       }
-      if (this.#sockets.size > 0) await pipeline.exec();
+      if (this.#sockets.size > 0) {
+        await pipeline.exec();
+      }
     } catch (error) {
       logger.error({ err: error }, 'Presence lease refresh failed');
     }
@@ -220,22 +260,17 @@ class PresenceService {
     userId: string,
     status: Exclude<PresenceStatus, 'offline'>
   ): Promise<PresenceUpdate> {
-    let updated;
-    try {
-      updated = await presenceRepository.setPreference(
-        userId,
-        toPreference(status)
-      );
-    } catch (error) {
-      if (
-        error instanceof Prisma.PrismaClientKnownRequestError &&
-        error.code === 'P2025'
-      )
-        throw new AppError('User not found', 404, 'UserNotFound');
-      throw error;
+    const updated = await presenceRepository.setPreference(
+      userId,
+      toPreference(status)
+    );
+    if (!updated) {
+      throw userNotFound();
     }
     const effective = await this.get(userId, updated.presencePreference);
-    if (effective.status !== 'offline') await this.#publish(effective);
+    if (effective.status !== 'offline') {
+      await this.#publish(effective);
+    }
     return effective;
   }
 
@@ -246,37 +281,38 @@ class PresenceService {
     const selected =
       preference ??
       (await presenceRepository.findPreference(userId))?.presencePreference;
-    if (!selected) throw new AppError('User not found', 404, 'UserNotFound');
+    if (!selected) {
+      throw userNotFound();
+    }
     const pipeline = redis.pipeline();
-    pipeline.zcount(socketKey(userId), Date.now() + 1, '+inf');
-    pipeline.exists(graceKey(userId));
+    queueLivenessChecks(pipeline, userId);
     const results = await pipeline.exec();
-    const online =
-      Number(results?.[0]?.[1]) > 0 || Number(results?.[1]?.[1]) > 0;
-    return { userId, status: online ? toStatus(selected) : 'offline' };
+    return {
+      userId,
+      status: isLive(results, 0) ? toStatus(selected) : 'offline',
+    };
   }
 
   async getMany(userIds: string[]): Promise<Map<string, PresenceStatus>> {
-    if (userIds.length === 0) return new Map();
+    if (userIds.length === 0) {
+      return new Map();
+    }
     const preferences = await presenceRepository.findPreferences(userIds);
     const selected = new Map(
       preferences.map(user => [user.id, user.presencePreference])
     );
     const pipeline = redis.pipeline();
-    const now = Date.now() + 1;
     for (const userId of userIds) {
-      pipeline.zcount(socketKey(userId), now, '+inf');
-      pipeline.exists(graceKey(userId));
+      queueLivenessChecks(pipeline, userId);
     }
-    const counts = await pipeline.exec();
+    const results = await pipeline.exec();
     return new Map(
-      userIds.map((userId, index) => [
-        userId,
-        Number(counts?.[index * 2]?.[1]) > 0 ||
-        Number(counts?.[index * 2 + 1]?.[1]) > 0
-          ? toStatus(selected.get(userId) ?? 'Online')
-          : 'offline',
-      ])
+      userIds.map((userId, index): [string, PresenceStatus] => {
+        if (!isLive(results, index * 2)) {
+          return [userId, 'offline'];
+        }
+        return [userId, toStatus(selected.get(userId) ?? 'Online')];
+      })
     );
   }
 

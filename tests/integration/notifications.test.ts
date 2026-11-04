@@ -4,11 +4,11 @@ import { app } from '../../src/app.js';
 import { prisma } from '../../src/database/client.js';
 import { publishAnnouncementJob } from '../../src/modules/announcements/announcement.publisher.js';
 import { announcementQueue } from '../../src/queues/announcement.queue.js';
-import { closeRedis } from '../../src/redis/client.js';
+import { closeRedis, redis } from '../../src/redis/client.js';
 import { socketPublisher } from '../../src/socket/socket.publisher.js';
 import { notificationBridge } from '../../src/socket/notification.bridge.js';
 import type { SocketServer } from '../../src/socket/socket.types.js';
-import { authorization, createUser } from './helpers.js';
+import { authorization, createUser, assertTestDatabase } from './helpers.js';
 
 // ==================== FIXTURES ====================
 
@@ -21,11 +21,7 @@ let memberToken: string;
 let outsiderToken: string;
 
 beforeAll(async () => {
-  const name = process.env.DATABASE_URL
-    ? new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0]
-    : '';
-  if (!name?.endsWith('_test'))
-    throw new Error('Integration tests require a test database');
+  assertTestDatabase();
   await prisma.$connect();
   const [owner, member, outsider] = await Promise.all([
     createUser(),
@@ -55,10 +51,13 @@ beforeAll(async () => {
 afterAll(async () => {
   vi.restoreAllMocks();
   await notificationBridge.close();
-  if (workspaceId)
+  if (workspaceId) {
     await prisma.workspace.delete({ where: { id: workspaceId } });
+  }
   for (const id of [ownerId, memberId, outsiderId]) {
-    if (id) await prisma.user.delete({ where: { id } });
+    if (id) {
+      await prisma.user.delete({ where: { id } });
+    }
   }
   await announcementQueue.close();
   await closeRedis();
@@ -216,17 +215,27 @@ describe('notifications', () => {
       }
     );
     await notificationBridge.start();
-    await notificationBridge.publish({
-      id: record.id,
-      userId: record.userId,
-      workspaceId: record.workspaceId,
-      type: record.type,
-      entityId: record.entityId,
-      title: record.title,
-      message: record.message,
-      readAt: record.readAt?.toISOString() ?? null,
-      createdAt: record.createdAt.toISOString(),
-    });
+    if (redis.status !== 'ready') {
+      await redis.connect();
+    }
+    await redis.publish(
+      'nodus:notification:created',
+      JSON.stringify({
+        kind: 'notification-created',
+        origin: 'standalone-worker',
+        notification: {
+          id: record.id,
+          userId: record.userId,
+          workspaceId: record.workspaceId,
+          type: record.type,
+          entityId: record.entityId,
+          title: record.title,
+          message: record.message,
+          readAt: record.readAt?.toISOString() ?? null,
+          createdAt: record.createdAt.toISOString(),
+        },
+      })
+    );
     expect(
       await Promise.race([
         received,

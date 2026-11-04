@@ -37,7 +37,6 @@ function validateRequest(
     } else if (target === 'params') {
       Object.assign(req.params, result.data);
     } else {
-      // Express 5 exposes req.query as a getter; keep transformed values in locals.
       res.locals.validatedQuery = result.data;
     }
     next();

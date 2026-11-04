@@ -4,6 +4,7 @@ import {
   validateBody,
   validateParams,
 } from '../../middleware/validation.middleware.js';
+import { noStore } from '../../middleware/no-store.middleware.js';
 import { workspaceParamsSchema } from '../workspaces/workspace.schema.js';
 import {
   acceptInvite,
@@ -19,10 +20,7 @@ import { inviteParamsSchema, inviteTokenSchema } from './invite.schema.js';
 export const inviteRouter = Router();
 export const workspaceInviteRouter = Router({ mergeParams: true });
 
-inviteRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+inviteRouter.use(noStore);
 inviteRouter.post('/resolve', validateBody(inviteTokenSchema), resolveInvite);
 inviteRouter.post(
   '/accept',
@@ -34,10 +32,7 @@ inviteRouter.post(
 // ==================== WORKSPACE INVITE ROUTES ====================
 
 workspaceInviteRouter.use(authenticate);
-workspaceInviteRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+workspaceInviteRouter.use(noStore);
 workspaceInviteRouter.post(
   '/',
   validateParams(workspaceParamsSchema),

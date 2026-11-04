@@ -16,7 +16,12 @@ import {
   userRoom,
 } from '../../src/socket/socket.rooms.js';
 import type { SocketServer } from '../../src/socket/socket.types.js';
-import { authorization, createUser, type TestUser } from './helpers.js';
+import {
+  authorization,
+  createUser,
+  type TestUser,
+  assertTestDatabase,
+} from './helpers.js';
 
 // ==================== TYPES ====================
 
@@ -54,10 +59,11 @@ async function createWorkspace(...members: Participant[]) {
   expect(created.status).toBe(201);
   const workspaceId = created.body.data.id as string;
   workspaceIds.add(workspaceId);
-  for (const user of members)
+  for (const user of members) {
     await prisma.workspaceMember.create({
       data: { workspaceId, userId: user.id },
     });
+  }
   const channels = await request(app)
     .get(`/workspaces/${workspaceId}/channels`)
     .set(authorization(owner.accessToken));
@@ -103,12 +109,12 @@ async function join(
 }
 
 async function waitFor(condition: () => boolean): Promise<void> {
-  for (let i = 0; i < 40 && !condition(); i += 1)
+  for (let i = 0; i < 40 && !condition(); i += 1) {
     await new Promise(resolve => setTimeout(resolve, 50));
+  }
   expect(condition()).toBe(true);
 }
 
-// Gives any wrongly addressed event time to arrive before asserting its absence.
 const settle = () => new Promise(resolve => setTimeout(resolve, 200));
 
 async function roomsOf(userId: string): Promise<Set<string>[]> {
@@ -130,10 +136,7 @@ function publishProbe(workspaceId: string, channelId: string): void {
 // ==================== SETUP ====================
 
 beforeAll(async () => {
-  const name = process.env.DATABASE_URL
-    ? new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0]
-    : '';
-  if (!name?.endsWith('_test')) throw new Error('Test database required');
+  assertTestDatabase();
   await prisma.$connect();
   [owner, member, bystander] = await Promise.all([
     participant(),
@@ -148,7 +151,9 @@ beforeAll(async () => {
     httpServer.listen(0, '127.0.0.1', resolve)
   );
   const bound = httpServer.address();
-  if (!bound || typeof bound === 'string') throw new Error('No test port');
+  if (!bound || typeof bound === 'string') {
+    throw new Error('No test port');
+  }
   address = `http://127.0.0.1:${bound.port}`;
 });
 
@@ -220,8 +225,9 @@ describe('workspace realtime cleanup', () => {
     const ownerSocket = await openSocket(owner.accessToken);
     const memberTab = await openSocket(member.accessToken);
     const memberDevice = await openSocket(member.accessToken);
-    for (const client of [ownerSocket, memberTab, memberDevice])
+    for (const client of [ownerSocket, memberTab, memberDevice]) {
       await join(client.socket, 'channel:join', deleted);
+    }
     await join(memberTab.socket, 'conversation:join', {
       workspaceId: deleted.workspaceId,
       conversationId,
@@ -247,11 +253,10 @@ describe('workspace realtime cleanup', () => {
     for (const rooms of [
       ...(await roomsOf(owner.id)),
       ...(await roomsOf(member.id)),
-    ])
+    ]) {
       expect(deletedRooms.some(room => rooms.has(room))).toBe(false);
+    }
 
-    // Events addressed to the deleted workspace reach nobody, while the other
-    // workspace subscription keeps working.
     publishProbe(deleted.workspaceId, deleted.channelId);
     const sent = await request(app)
       .post(
@@ -267,8 +272,9 @@ describe('workspace realtime cleanup', () => {
     ]);
     expect(ownerSocket.messages).toHaveLength(0);
     expect(memberTab.messages).toHaveLength(0);
-    for (const client of [ownerSocket, memberTab, memberDevice])
+    for (const client of [ownerSocket, memberTab, memberDevice]) {
       client.socket.disconnect();
+    }
   });
 
   it('applies revocations forwarded by another API process through Redis', async () => {
@@ -291,6 +297,34 @@ describe('workspace realtime cleanup', () => {
     expect((await roomsOf(member.id)).every(rooms => !rooms.has(room))).toBe(
       true
     );
+    client.socket.disconnect();
+  });
+
+  it('delivers channel messages relayed by another API process', async () => {
+    const { workspaceId, channelId } = await createWorkspace(member);
+    const client = await openSocket(member.accessToken);
+    await join(client.socket, 'channel:join', { workspaceId, channelId });
+
+    const message = {
+      id: '00000000-0000-4000-8000-000000000002',
+      channelId,
+      author: { id: owner.id, firstName: 'Test', lastName: 'User' },
+      content: 'From another process',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+    await redis.publish(
+      'nodus:notification:created',
+      JSON.stringify({
+        kind: 'message-created',
+        origin: 'another-api-process',
+        workspaceId,
+        message,
+      })
+    );
+
+    await waitFor(() => client.messages.length === 1);
+    expect(client.messages[0]).toEqual({ workspaceId, message });
     client.socket.disconnect();
   });
 

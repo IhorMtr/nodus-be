@@ -10,7 +10,7 @@ import { closeRedis } from '../../src/redis/client.js';
 import { initializeSocket } from '../../src/socket/index.js';
 import { conversationRoom, userRoom } from '../../src/socket/socket.rooms.js';
 import type { SocketServer } from '../../src/socket/socket.types.js';
-import { authorization, createUser } from './helpers.js';
+import { authorization, createUser, assertTestDatabase } from './helpers.js';
 
 // ==================== FIXTURES ====================
 
@@ -48,16 +48,14 @@ async function openSocket(token: string): Promise<Socket> {
 }
 
 async function awaitEvent(events: unknown[], count: number): Promise<void> {
-  for (let i = 0; i < 30 && events.length < count; i += 1)
+  for (let i = 0; i < 30 && events.length < count; i += 1) {
     await new Promise(resolve => setTimeout(resolve, 50));
+  }
   expect(events).toHaveLength(count);
 }
 
 beforeAll(async () => {
-  const name = process.env.DATABASE_URL
-    ? new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0]
-    : '';
-  if (!name?.endsWith('_test')) throw new Error('Test database required');
+  assertTestDatabase();
   await prisma.$connect();
   const [owner, member, outsider, bystander] = await Promise.all([
     createUser(),
@@ -98,7 +96,9 @@ beforeAll(async () => {
     httpServer.listen(0, '127.0.0.1', resolve)
   );
   const bound = httpServer.address();
-  if (!bound || typeof bound === 'string') throw new Error('No test port');
+  if (!bound || typeof bound === 'string') {
+    throw new Error('No test port');
+  }
   address = `http://127.0.0.1:${bound.port}`;
 });
 
@@ -211,6 +211,11 @@ describe('direct conversations', () => {
       .set(auth(memberToken));
     expect(older.body.data.items).toHaveLength(1);
     expect(older.body.data.items[0].id).not.toBe(page.body.data.items[0].id);
+    const forward = await request(app)
+      .get(`${messagesUrl()}?after=${page.body.data.nextCursor as string}`)
+      .set(auth(memberToken));
+    expect(forward.status).toBe(400);
+    expect(forward.body.messageType).toBe('ValidationFailed');
     expect(
       (
         await request(app)

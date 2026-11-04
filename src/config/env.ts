@@ -1,7 +1,7 @@
 import 'dotenv/config';
 import { z } from 'zod';
 
-// ==================== SCHEMA ====================
+// ==================== FIELD SCHEMAS ====================
 
 function connectionUrl(protocols: readonly string[]) {
   return z.url().pipe(
@@ -17,6 +17,18 @@ function connectionUrl(protocols: readonly string[]) {
   );
 }
 
+const corsOriginSchema = z.url().pipe(
+  z.string().refine(
+    value => {
+      const url = new URL(value);
+      return ['http:', 'https:'].includes(url.protocol) && value === url.origin;
+    },
+    { message: 'Expected an HTTP(S) origin without a path or trailing slash' }
+  )
+);
+
+// ==================== SCHEMA ====================
+
 const envSchema = z
   .object({
     NODE_ENV: z
@@ -31,29 +43,7 @@ const envSchema = z
       .string()
       .default('http://localhost:5173')
       .transform(value => value.split(',').map(origin => origin.trim()))
-      .pipe(
-        z
-          .array(
-            z.url().pipe(
-              z.string().refine(
-                value => {
-                  const url = new URL(value);
-                  return (
-                    ['http:', 'https:'].includes(url.protocol) &&
-                    value === url.origin
-                  );
-                },
-                {
-                  message:
-                    'Expected an HTTP(S) origin without a path or trailing slash',
-                }
-              )
-            )
-          )
-          .min(1)
-      ),
-    // Reverse proxies in front of the app that append to X-Forwarded-For. A number,
-    // never `true`, so a client cannot choose its own IP by forging the header.
+      .pipe(z.array(corsOriginSchema).min(1)),
     TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(10).default(0),
     LOG_LEVEL: z
       .enum(['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'])

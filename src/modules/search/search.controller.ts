@@ -1,27 +1,16 @@
-import type { Request, RequestHandler } from 'express';
+import type { RequestHandler } from 'express';
 import type { Query } from 'express-serve-static-core';
-import { AppError } from '../../shared/errors/app-error.js';
+import { authenticatedUserId } from '../../middleware/auth.middleware.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
+import type { WorkspaceParams } from '../workspaces/workspace.types.js';
 import { searchService } from './search.service.js';
-import type {
-  MessageSearchPage,
-  SearchParams,
-  SearchQuery,
-} from './search.types.js';
+import type { MessageSearchPage, SearchQuery } from './search.types.js';
 
-// ==================== AUTH CONTEXT ====================
-
-function authenticatedUserId(req: Request): string {
-  if (!req.auth)
-    throw new AppError('Access token is required', 401, 'Unauthorized');
-  return req.auth.userId;
-}
-
-// ==================== PUBLIC API ====================
+// ==================== HANDLERS ====================
 
 export const searchMessages: RequestHandler<
-  SearchParams,
+  WorkspaceParams,
   ApiResponse<MessageSearchPage>,
   unknown,
   Query,

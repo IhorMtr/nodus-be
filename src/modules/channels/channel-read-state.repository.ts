@@ -1,5 +1,6 @@
 import { prisma } from '../../database/client.js';
 import { Prisma } from '../../generated/prisma/client.js';
+import type { MessageAuthor } from '../messages/message.types.js';
 
 // ==================== TYPES ====================
 
@@ -10,6 +11,8 @@ type ReadStateRow = {
 };
 
 type UnreadRow = { channelId: string; unreadCount: bigint };
+
+type ReceiptRow = MessageAuthor & { messageId: string };
 
 // ==================== QUERIES ====================
 
@@ -73,17 +76,17 @@ async function advance(
   return rows[0] ?? null;
 }
 
-// ==================== RECEIPTS ====================
+// ==================== RECEIPT QUERIES ====================
 
-async function receipts(channelId: string, messageIds: string[]) {
-  if (messageIds.length === 0)
-    return new Map<
-      string,
-      { id: string; firstName: string; lastName: string }[]
-    >();
-  const rows = await prisma.$queryRaw<
-    { messageId: string; id: string; firstName: string; lastName: string }[]
-  >`
+async function receipts(
+  channelId: string,
+  messageIds: string[]
+): Promise<Map<string, MessageAuthor[]>> {
+  const result = new Map<string, MessageAuthor[]>();
+  if (messageIds.length === 0) {
+    return result;
+  }
+  const rows = await prisma.$queryRaw<ReceiptRow[]>`
     SELECT m.id AS "messageId", u.id, u."firstName", u."lastName"
     FROM "Message" m
     JOIN "Channel" c ON c.id = m."channelId"
@@ -94,18 +97,10 @@ async function receipts(channelId: string, messageIds: string[]) {
     WHERE m."channelId" = ${channelId}::uuid AND m.id IN (${Prisma.join(messageIds.map(id => Prisma.sql`${id}::uuid`))})
     ORDER BY u.id
   `;
-  const result = new Map<
-    string,
-    { id: string; firstName: string; lastName: string }[]
-  >();
-  for (const row of rows) {
-    const readers = result.get(row.messageId) ?? [];
-    readers.push({
-      id: row.id,
-      firstName: row.firstName,
-      lastName: row.lastName,
-    });
-    result.set(row.messageId, readers);
+  for (const { messageId, ...reader } of rows) {
+    const readers = result.get(messageId) ?? [];
+    readers.push(reader);
+    result.set(messageId, readers);
   }
   return result;
 }

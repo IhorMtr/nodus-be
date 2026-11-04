@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express';
 import type { ParamsDictionary } from 'express-serve-static-core';
-import { AppError } from '../../shared/errors/app-error.js';
+import { authenticatedUserId } from '../../middleware/auth.middleware.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
 import { inviteService } from './invite.service.js';
@@ -13,14 +13,6 @@ import type {
   ResolvedInvite,
 } from './invite.types.js';
 import type { WorkspaceParams } from '../workspaces/workspace.types.js';
-
-// ==================== AUTHENTICATION ====================
-
-function authenticatedUserId(req: Parameters<RequestHandler>[0]): string {
-  if (!req.auth)
-    throw new AppError('Access token is required', 401, 'Unauthorized');
-  return req.auth.userId;
-}
 
 // ==================== HANDLERS ====================
 

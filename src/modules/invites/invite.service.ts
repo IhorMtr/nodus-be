@@ -19,34 +19,58 @@ import type {
 const INVITE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 const INVITE_TOKEN_BYTES = 32;
 
-// ==================== HELPERS ====================
+// ==================== TYPES ====================
 
 type InviteRecord = NonNullable<
   Awaited<ReturnType<InviteRepository['findById']>>
 >;
 
+// ==================== HELPERS ====================
+
 function tokenHash(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+function inviteStatus(invite: InviteRecord, now: Date): PublicInvite['status'] {
+  if (invite.revokedAt) {
+    return 'revoked';
+  }
+  if (invite.usedAt) {
+    return 'used';
+  }
+  if (invite.expiresAt <= now) {
+    return 'expired';
+  }
+  return 'active';
+}
+
+function assertRevocable(
+  invite: InviteRecord | null
+): asserts invite is InviteRecord {
+  if (!invite) {
+    throw inviteErrors.notFound();
+  }
+  if (invite.revokedAt) {
+    throw inviteErrors.revoked();
+  }
+  if (invite.usedAt) {
+    throw inviteErrors.alreadyUsed();
+  }
 }
 
 function assertActive(
   invite: InviteRecord | null,
   now: Date
 ): asserts invite is InviteRecord {
-  if (!invite) throw inviteErrors.notFound();
-  if (invite.revokedAt) throw inviteErrors.revoked();
-  if (invite.usedAt) throw inviteErrors.alreadyUsed();
-  if (invite.expiresAt <= now) throw inviteErrors.expired();
+  assertRevocable(invite);
+  if (invite.expiresAt <= now) {
+    throw inviteErrors.expired();
+  }
 }
 
+// ==================== PUBLIC DATA ====================
+
 function toPublicInvite(invite: InviteRecord, now: Date): PublicInvite {
-  const status = invite.revokedAt
-    ? 'revoked'
-    : invite.usedAt
-      ? 'used'
-      : invite.expiresAt <= now
-        ? 'expired'
-        : 'active';
   return {
     id: invite.id,
     workspaceId: invite.workspaceId,
@@ -55,11 +79,11 @@ function toPublicInvite(invite: InviteRecord, now: Date): PublicInvite {
     usedAt: invite.usedAt?.toISOString() ?? null,
     revokedAt: invite.revokedAt?.toISOString() ?? null,
     createdAt: invite.createdAt.toISOString(),
-    status,
+    status: inviteStatus(invite, now),
   };
 }
 
-// ==================== CREATE INVITE ====================
+// ==================== INVITE LIFECYCLE ====================
 
 async function createInvite(
   workspaceId: string,
@@ -97,8 +121,6 @@ async function resolveInvite(token: string): Promise<ResolvedInvite> {
   };
 }
 
-// ==================== ACCEPT INVITE ====================
-
 async function acceptInvite(
   token: string,
   userId: string
@@ -109,9 +131,12 @@ async function acceptInvite(
       const invite = await repository.findByHash(hash);
       const now = new Date();
       assertActive(invite, now);
-      if (await repository.findMembership(invite.workspaceId, userId))
+      if (await repository.findMembership(invite.workspaceId, userId)) {
         throw inviteErrors.alreadyMember();
-      if (!(await repository.claim(invite.id, now))) {
+      }
+
+      const claimed = await repository.claim(invite.id, now);
+      if (!claimed) {
         assertActive(await repository.findByHash(hash), new Date());
         throw inviteErrors.alreadyUsed();
       }
@@ -119,12 +144,12 @@ async function acceptInvite(
       return { workspaceId: invite.workspaceId, role: 'Member' };
     });
   } catch (error) {
-    if (isUniqueMembershipError(error)) throw inviteErrors.alreadyMember();
+    if (isUniqueMembershipError(error)) {
+      throw inviteErrors.alreadyMember();
+    }
     throw error;
   }
 }
-
-// ==================== REVOKE INVITE ====================
 
 async function revokeInvite(
   workspaceId: string,
@@ -132,17 +157,20 @@ async function revokeInvite(
   userId: string
 ): Promise<void> {
   await requireWorkspaceRole(workspaceId, userId, ['Owner', 'Admin']);
-  const invite = await inviteRepository.findById(workspaceId, inviteId);
-  if (!invite) throw inviteErrors.notFound();
-  if (invite.revokedAt) throw inviteErrors.revoked();
-  if (invite.usedAt) throw inviteErrors.alreadyUsed();
-  if (!(await inviteRepository.revoke(workspaceId, inviteId, new Date()))) {
-    const current = await inviteRepository.findById(workspaceId, inviteId);
-    if (!current) throw inviteErrors.notFound();
-    if (current.revokedAt) throw inviteErrors.revoked();
+  assertRevocable(await inviteRepository.findById(workspaceId, inviteId));
+
+  const revoked = await inviteRepository.revoke(
+    workspaceId,
+    inviteId,
+    new Date()
+  );
+  if (!revoked) {
+    assertRevocable(await inviteRepository.findById(workspaceId, inviteId));
     throw inviteErrors.alreadyUsed();
   }
 }
+
+// ==================== PUBLIC API ====================
 
 export const inviteService = {
   createInvite,

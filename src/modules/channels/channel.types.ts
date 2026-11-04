@@ -1,7 +1,6 @@
 import type { z } from 'zod';
 import type {
   channelParamsSchema,
-  channelWorkspaceParamsSchema,
   createChannelSchema,
   markChannelReadSchema,
   updateChannelSchema,
@@ -12,9 +11,6 @@ import type {
 export type CreateChannelInput = z.infer<typeof createChannelSchema>;
 export type UpdateChannelInput = z.infer<typeof updateChannelSchema>;
 export type MarkChannelReadInput = z.infer<typeof markChannelReadSchema>;
-export type ChannelWorkspaceParams = z.infer<
-  typeof channelWorkspaceParamsSchema
->;
 export type ChannelParams = z.infer<typeof channelParamsSchema>;
 
 // ==================== RESPONSE TYPES ====================

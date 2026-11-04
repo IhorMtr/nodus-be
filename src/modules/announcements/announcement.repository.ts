@@ -76,7 +76,9 @@ async function update(
       },
       data,
     });
-    if (result.count !== 1) return null;
+    if (result.count !== 1) {
+      return null;
+    }
     const record = await transaction.announcement.findFirstOrThrow({
       where: { workspaceId, id },
       select,
@@ -117,7 +119,9 @@ async function publish(id: string, version: number) {
       },
       data: { publishedAt: new Date() },
     });
-    if (result.count !== 1) return null;
+    if (result.count !== 1) {
+      return null;
+    }
     const record = await transaction.announcement.findUniqueOrThrow({
       where: { id },
       select,

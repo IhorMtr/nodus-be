@@ -4,20 +4,19 @@ import {
   validateParams,
   validateQuery,
 } from '../../middleware/validation.middleware.js';
+import { noStore } from '../../middleware/no-store.middleware.js';
 import { searchMessages } from './search.controller.js';
-import { searchParamsSchema, searchQuerySchema } from './search.schema.js';
+import { workspaceParamsSchema } from '../workspaces/workspace.schema.js';
+import { searchQuerySchema } from './search.schema.js';
 
 // ==================== ROUTES ====================
 
 export const searchRouter = Router({ mergeParams: true });
 searchRouter.use(authenticate);
-searchRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+searchRouter.use(noStore);
 searchRouter.get(
   '/messages',
-  validateParams(searchParamsSchema),
+  validateParams(workspaceParamsSchema),
   validateQuery(searchQuerySchema),
   searchMessages
 );

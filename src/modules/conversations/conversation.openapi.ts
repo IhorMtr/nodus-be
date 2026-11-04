@@ -213,6 +213,8 @@ export const conversationPaths: OpenAPIV3.PathsObject = {
       security,
       operationId: 'listDirectMessages',
       summary: 'Read direct message history',
+      description:
+        'Returns messages oldest first and pages backwards with nextCursor. Only limit and before are accepted; any other query parameter is rejected with ValidationFailed.',
       parameters: [
         {
           name: 'limit',

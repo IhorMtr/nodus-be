@@ -10,7 +10,12 @@ import { closeRedis } from '../../src/redis/client.js';
 import { redis } from '../../src/redis/client.js';
 import { initializeSocket } from '../../src/socket/index.js';
 import type { SocketServer } from '../../src/socket/socket.types.js';
-import { authorization, createUser, loginUser } from './helpers.js';
+import {
+  authorization,
+  createUser,
+  loginUser,
+  assertTestDatabase,
+} from './helpers.js';
 
 // ==================== FIXTURES ====================
 
@@ -56,7 +61,9 @@ async function expectStatus(
   expected: string
 ): Promise<void> {
   for (let attempt = 0; attempt < 30; attempt += 1) {
-    if ((await memberStatus(token, userId)) === expected) return;
+    if ((await memberStatus(token, userId)) === expected) {
+      return;
+    }
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   expect(await memberStatus(token, userId)).toBe(expected);
@@ -70,19 +77,16 @@ async function expectEvent(
   for (let attempt = 0; attempt < 30; attempt += 1) {
     if (
       events.some(event => event.userId === userId && event.status === status)
-    )
+    ) {
       return;
+    }
     await new Promise(resolve => setTimeout(resolve, 100));
   }
   expect(events).toContainEqual({ userId, status });
 }
 
 beforeAll(async () => {
-  const databaseName = process.env.DATABASE_URL
-    ? new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0]
-    : '';
-  if (!databaseName?.endsWith('_test'))
-    throw new Error('Test database required');
+  assertTestDatabase();
   await prisma.$connect();
   const [owner, member, outsider] = await Promise.all([
     createUser(),
@@ -114,17 +118,22 @@ beforeAll(async () => {
     httpServer.listen(0, '127.0.0.1', resolve)
   );
   const bound = httpServer.address();
-  if (!bound || typeof bound === 'string') throw new Error('No test port');
+  if (!bound || typeof bound === 'string') {
+    throw new Error('No test port');
+  }
   address = `http://127.0.0.1:${bound.port}`;
 });
 
 afterAll(async () => {
-  for (const socket of sockets) socket.disconnect();
+  for (const socket of sockets) {
+    socket.disconnect();
+  }
   await presenceService.close();
   await new Promise<void>(resolve => httpServer.close(() => resolve()));
   await prisma.workspace.delete({ where: { id: workspaceId } });
-  for (const id of [ownerId, memberId, outsiderId])
+  for (const id of [ownerId, memberId, outsiderId]) {
     await prisma.user.delete({ where: { id } });
+  }
   await announcementQueue.close();
   await closeRedis();
   await prisma.$disconnect();
@@ -204,8 +213,9 @@ describe('presence', () => {
       let attempt = 0;
       attempt < 30 && memberEvents.length === beforeBridge;
       attempt += 1
-    )
+    ) {
       await new Promise(resolve => setTimeout(resolve, 100));
+    }
     expect(memberEvents.length).toBe(beforeBridge + 1);
     expect(outsiderEvents.some(event => event.userId === ownerId)).toBe(false);
     expect(

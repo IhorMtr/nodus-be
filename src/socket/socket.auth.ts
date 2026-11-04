@@ -6,7 +6,6 @@ import type { AppSocket } from './socket.types.js';
 
 // ==================== HANDSHAKE AUTHENTICATION ====================
 
-// Clients send the access token in the handshake `auth` payload, never in the URL.
 export function authenticateSocket(
   socket: AppSocket,
   next: (error?: ExtendedError) => void
@@ -18,11 +17,9 @@ export function authenticateSocket(
   }
 
   try {
-    // Room names are case sensitive and REST params are normalized to lowercase.
     socket.data.userId = verifyAccessToken(token).userId.toLowerCase();
     next();
   } catch (error) {
-    // Only the public application code reaches the client, never verifier internals.
     next(new Error(error instanceof AppError ? error.code : 'Unauthorized'));
   }
 }

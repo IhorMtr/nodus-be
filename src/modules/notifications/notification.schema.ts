@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { uuidSchema } from '../../shared/validation/schemas.js';
 
 // ==================== REQUESTS ====================
 
 export const notificationParamsSchema = z.strictObject({
-  notificationId: z.uuid().transform(value => value.toLowerCase()),
+  notificationId: uuidSchema,
 });
 
 export const notificationListQuerySchema = z.strictObject({

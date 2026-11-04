@@ -1,8 +1,7 @@
-import { announcementRepository } from './announcement.repository.js';
 import type { PublishAnnouncementJob } from '../../queues/announcement.queue.js';
-import { socketPublisher } from '../../socket/socket.publisher.js';
 import { notificationBridge } from '../../socket/notification.bridge.js';
 import { toPublicNotification } from '../notifications/notification.service.js';
+import { announcementRepository } from './announcement.repository.js';
 
 // ==================== PUBLICATION ====================
 
@@ -13,12 +12,16 @@ export async function publishAnnouncementJob(
     job.announcementId,
     job.scheduleVersion
   );
-  if (!notifications) return false;
-  for (const notification of notifications) {
-    const publicNotification = toPublicNotification(notification);
-    if (socketPublisher.hasServer())
-      socketPublisher.publishNotificationCreated(publicNotification);
-    else await notificationBridge.publish(publicNotification);
+  if (!notifications) {
+    return false;
   }
+  await Promise.all(
+    notifications.map(notification =>
+      notificationBridge.broadcast({
+        kind: 'notification-created',
+        notification: toPublicNotification(notification),
+      })
+    )
+  );
   return true;
 }

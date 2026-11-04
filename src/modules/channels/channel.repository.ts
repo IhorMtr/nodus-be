@@ -1,6 +1,9 @@
-import { z } from 'zod';
 import { prisma } from '../../database/client.js';
-import { Prisma } from '../../generated/prisma/client.js';
+import {
+  isPrismaError,
+  uniqueViolationTargets,
+} from '../../database/errors.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 
 // ==================== SELECTS ====================
 
@@ -59,48 +62,15 @@ async function deleteChannel(
 // ==================== DATABASE ERRORS ====================
 
 export function isChannelNameConflictError(error: unknown): boolean {
-  if (
-    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
-    error.code !== 'P2002'
-  ) {
-    return false;
-  }
-  const target: unknown = error.meta?.['target'];
-  if (
-    target === channelNameIndex ||
-    (Array.isArray(target) && target.includes(channelNameIndex))
-  ) {
-    return true;
-  }
-
-  // The PostgreSQL adapter reports expression index violations by index name.
-  const adapterError = z
-    .object({
-      cause: z.object({
-        kind: z.literal('UniqueConstraintViolation'),
-        constraint: z.object({ index: z.string() }),
-      }),
-    })
-    .safeParse(error.meta?.['driverAdapterError']);
-
-  return (
-    adapterError.success &&
-    adapterError.data.cause.constraint.index === channelNameIndex
-  );
+  return uniqueViolationTargets(error).includes(channelNameIndex);
 }
 
 export function isChannelNotFoundError(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2025'
-  );
+  return isPrismaError(error, 'recordNotFound');
 }
 
 export function isChannelWorkspaceMissingError(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2003'
-  );
+  return isPrismaError(error, 'foreignKeyViolation');
 }
 
 // ==================== PUBLIC API ====================

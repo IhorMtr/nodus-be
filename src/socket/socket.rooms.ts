@@ -1,7 +1,5 @@
 // ==================== ROOM NAMES ====================
 
-// Room names are case sensitive; callers pass UUIDs already normalized to lowercase.
-
 export function userRoom(userId: string): string {
   return `user:${userId}`;
 }

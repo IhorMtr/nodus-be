@@ -4,6 +4,7 @@ import {
   validateBody,
   validateParams,
 } from '../../middleware/validation.middleware.js';
+import { noStore } from '../../middleware/no-store.middleware.js';
 import {
   createAnnouncement,
   deleteAnnouncement,
@@ -11,9 +12,9 @@ import {
   listAnnouncements,
   updateAnnouncement,
 } from './announcement.controller.js';
+import { workspaceParamsSchema } from '../workspaces/workspace.schema.js';
 import {
   announcementParamsSchema,
-  announcementWorkspaceParamsSchema,
   createAnnouncementSchema,
   updateAnnouncementSchema,
 } from './announcement.schema.js';
@@ -22,22 +23,19 @@ import {
 
 export const announcementRouter = Router({ mergeParams: true });
 announcementRouter.use(authenticate);
-announcementRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+announcementRouter.use(noStore);
 
 // ==================== ROUTES ====================
 
 announcementRouter.post(
   '/',
-  validateParams(announcementWorkspaceParamsSchema),
+  validateParams(workspaceParamsSchema),
   validateBody(createAnnouncementSchema),
   createAnnouncement
 );
 announcementRouter.get(
   '/',
-  validateParams(announcementWorkspaceParamsSchema),
+  validateParams(workspaceParamsSchema),
   listAnnouncements
 );
 announcementRouter.get(

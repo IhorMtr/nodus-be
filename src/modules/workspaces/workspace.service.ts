@@ -1,10 +1,10 @@
 import type { WorkspaceRole } from '../../generated/prisma/client.js';
-import { socketPublisher } from '../../socket/socket.publisher.js';
+import { toPublicNotification } from '../notifications/notification.service.js';
+import type { PublicNotification } from '../notifications/notification.types.js';
 import {
   presenceService,
   type PresenceStatus,
 } from '../presence/presence.service.js';
-import { toPublicNotification } from '../notifications/notification.service.js';
 import { workspaceErrors } from './workspace.errors.js';
 import {
   isWorkspaceConflictError,
@@ -20,7 +20,7 @@ import type {
   UpdateWorkspaceInput,
 } from './workspace.types.js';
 
-// ==================== PUBLIC DATA ====================
+// ==================== TYPES ====================
 
 type WorkspaceRecord = Awaited<
   ReturnType<WorkspaceRepository['createWithOwner']>
@@ -28,6 +28,8 @@ type WorkspaceRecord = Awaited<
 type MemberRecord = NonNullable<
   Awaited<ReturnType<WorkspaceRepository['findMember']>>
 >;
+
+// ==================== PUBLIC DATA ====================
 
 function toPublicWorkspace(
   workspace: WorkspaceRecord,
@@ -65,7 +67,9 @@ export async function requireWorkspaceMember(
   repository: WorkspaceRepository = workspaceRepository
 ) {
   const membership = await repository.findMembership(workspaceId, userId);
-  if (!membership) throw workspaceErrors.notFound();
+  if (!membership) {
+    throw workspaceErrors.notFound();
+  }
   return membership;
 }
 
@@ -80,10 +84,28 @@ export async function requireWorkspaceRole(
     userId,
     repository
   );
-  if (!roles.includes(membership.role))
+  if (!roles.includes(membership.role)) {
     throw workspaceErrors.insufficientRole();
+  }
   return membership;
 }
+
+async function requireChangeableMember(
+  repository: WorkspaceRepository,
+  workspaceId: string,
+  memberUserId: string
+): Promise<MemberRecord> {
+  const member = await repository.findMember(workspaceId, memberUserId);
+  if (!member) {
+    throw workspaceErrors.memberNotFound();
+  }
+  if (member.role === 'Owner') {
+    throw workspaceErrors.ownerProtected();
+  }
+  return member;
+}
+
+// ==================== TRANSACTIONS ====================
 
 async function runWorkspaceTransaction<T>(
   operation: (repository: WorkspaceRepository) => Promise<T>
@@ -91,7 +113,9 @@ async function runWorkspaceTransaction<T>(
   try {
     return await withWorkspaceTransaction(operation);
   } catch (error) {
-    if (isWorkspaceConflictError(error)) throw workspaceErrors.conflict();
+    if (isWorkspaceConflictError(error)) {
+      throw workspaceErrors.conflict();
+    }
     throw error;
   }
 }
@@ -141,7 +165,6 @@ async function updateWorkspace(
   });
 }
 
-// Resolves to the ids of every former member, including the Owner.
 async function deleteWorkspace(
   workspaceId: string,
   userId: string
@@ -175,7 +198,10 @@ async function updateMemberRole(
   userId: string,
   memberUserId: string,
   input: UpdateMemberRoleInput
-): Promise<PublicWorkspaceMember> {
+): Promise<{
+  member: PublicWorkspaceMember;
+  notification: PublicNotification | null;
+}> {
   const result = await runWorkspaceTransaction(async repository => {
     const actor = await requireWorkspaceRole(
       workspaceId,
@@ -183,10 +209,14 @@ async function updateMemberRole(
       ['Owner'],
       repository
     );
-    const member = await repository.findMember(workspaceId, memberUserId);
-    if (!member) throw workspaceErrors.memberNotFound();
-    if (member.role === 'Owner') throw workspaceErrors.ownerProtected();
-    if (member.role === input.role) return { member, notification: null };
+    const member = await requireChangeableMember(
+      repository,
+      workspaceId,
+      memberUserId
+    );
+    if (member.role === input.role) {
+      return { member, notification: null };
+    }
 
     const updated = await repository.updateMemberRole(
       workspaceId,
@@ -194,7 +224,9 @@ async function updateMemberRole(
       member.role,
       input.role
     );
-    if (!updated) throw workspaceErrors.conflict();
+    if (!updated) {
+      throw workspaceErrors.conflict();
+    }
     const notification = await repository.createMemberNotification(
       workspaceId,
       memberUserId,
@@ -202,24 +234,23 @@ async function updateMemberRole(
       'Workspace role changed',
       `Your role in ${actor.workspace.name} is now ${input.role}`
     );
-    return {
-      member: { ...member, role: input.role },
-      notification,
-    };
+    return { member: { ...member, role: input.role }, notification };
   });
-  if (result.notification)
-    socketPublisher.publishNotificationCreated(
-      toPublicNotification(result.notification)
-    );
+
   const presence = await presenceService.get(result.member.userId);
-  return toPublicMember(result.member, presence.status);
+  return {
+    member: toPublicMember(result.member, presence.status),
+    notification: result.notification
+      ? toPublicNotification(result.notification)
+      : null,
+  };
 }
 
 async function removeMember(
   workspaceId: string,
   userId: string,
   memberUserId: string
-): Promise<void> {
+): Promise<PublicNotification> {
   const notification = await runWorkspaceTransaction(async repository => {
     const actor = await requireWorkspaceRole(
       workspaceId,
@@ -227,20 +258,26 @@ async function removeMember(
       ['Owner', 'Admin'],
       repository
     );
-    const member = await repository.findMember(workspaceId, memberUserId);
-    if (!member) throw workspaceErrors.memberNotFound();
-    if (member.role === 'Owner') throw workspaceErrors.ownerProtected();
-    if (actor.userId === member.userId)
+    const member = await requireChangeableMember(
+      repository,
+      workspaceId,
+      memberUserId
+    );
+    if (actor.userId === member.userId) {
       throw workspaceErrors.cannotRemoveSelf();
-    if (actor.role === 'Admin' && member.role !== 'Member')
+    }
+    if (actor.role === 'Admin' && member.role !== 'Member') {
       throw workspaceErrors.insufficientRole();
+    }
 
     const removed = await repository.removeMember(
       workspaceId,
       memberUserId,
       member.role
     );
-    if (!removed) throw workspaceErrors.conflict();
+    if (!removed) {
+      throw workspaceErrors.conflict();
+    }
     return repository.createMemberNotification(
       workspaceId,
       memberUserId,
@@ -249,9 +286,7 @@ async function removeMember(
       `You were removed from ${actor.workspace.name}`
     );
   });
-  socketPublisher.publishNotificationCreated(
-    toPublicNotification(notification)
-  );
+  return toPublicNotification(notification);
 }
 
 // ==================== PUBLIC API ====================

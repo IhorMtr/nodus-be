@@ -3,12 +3,14 @@ import { logger } from '../config/logger.js';
 import { queueConnection } from './connection.js';
 import { QUEUE_NAMES } from './queue-names.js';
 
-// ==================== JOB TYPES AND QUEUE ====================
+// ==================== TYPES ====================
 
 export type PublishAnnouncementJob = {
   announcementId: string;
   scheduleVersion: number;
 };
+
+// ==================== QUEUE ====================
 
 export const announcementQueue = new Queue<PublishAnnouncementJob>(
   QUEUE_NAMES.announcements,
@@ -50,5 +52,7 @@ export async function enqueueAnnouncement(
 
 export async function removeAnnouncementJob(id: string, version: number) {
   const job = await announcementQueue.getJob(announcementJobId(id, version));
-  if (job) await job.remove();
+  if (job) {
+    await job.remove();
+  }
 }

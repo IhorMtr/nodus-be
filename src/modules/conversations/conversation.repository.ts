@@ -1,5 +1,10 @@
 import { prisma } from '../../database/client.js';
-import { Prisma, NotificationType } from '../../generated/prisma/client.js';
+import {
+  NotificationType,
+  type Prisma,
+} from '../../generated/prisma/client.js';
+import { olderThan } from '../../shared/pagination/cursor.js';
+import { notificationSelect } from '../notifications/notification.repository.js';
 import type { DirectHistoryQuery } from './conversation.types.js';
 
 // ==================== SELECTS ====================
@@ -68,7 +73,9 @@ async function createPair(
       AND "userId" IN (${firstUserId}::uuid, ${secondUserId}::uuid)
     ORDER BY "userId" FOR KEY SHARE
   `;
-    if (members.length !== 2) return null;
+    if (members.length !== 2) {
+      return null;
+    }
     const rows = await tx.$queryRaw<{ id: string }[]>`
     INSERT INTO "Conversation" (id, "workspaceId", "firstUserId", "secondUserId", "createdAt", "updatedAt")
     SELECT gen_random_uuid(), ${workspaceId}::uuid, ${firstUserId}::uuid, ${secondUserId}::uuid,
@@ -105,7 +112,9 @@ async function activeParticipants(workspaceId: string, conversationId: string) {
     where: { id: conversationId, workspaceId },
     select: { firstUserId: true, secondUserId: true },
   });
-  if (!record) return [];
+  if (!record) {
+    return [];
+  }
   const rows = await members(workspaceId, [
     record.firstUserId,
     record.secondUserId,
@@ -129,15 +138,7 @@ function listMessages(
   return prisma.directMessage.findMany({
     where: {
       conversationId,
-      ...(before
-        ? {
-            createdAt: { lte: before.createdAt },
-            OR: [
-              { createdAt: { lt: before.createdAt } },
-              { createdAt: before.createdAt, id: { lt: before.id } },
-            ],
-          }
-        : {}),
+      ...(before ? olderThan(before) : {}),
     },
     select: messageSelect,
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -159,7 +160,9 @@ async function createMessage(
         AND "userId" IN (${authorId}::uuid, ${recipientId}::uuid)
       ORDER BY "userId" FOR KEY SHARE
     `;
-    if (lockedMembers.length !== 2) return null;
+    if (lockedMembers.length !== 2) {
+      return null;
+    }
     const rows = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO "DirectMessage" (id, "conversationId", "authorId", content, "createdAt", "updatedAt")
       SELECT gen_random_uuid(), c.id, ${authorId}::uuid, ${content}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
@@ -172,7 +175,9 @@ async function createMessage(
       RETURNING id
     `;
     const id = rows[0]?.id;
-    if (!id) return null;
+    if (!id) {
+      return null;
+    }
     await tx.conversation.update({
       where: { id: conversationId },
       data: { updatedAt: new Date() },
@@ -190,17 +195,7 @@ async function createMessage(
         title: 'New direct message',
         message: content,
       },
-      select: {
-        id: true,
-        userId: true,
-        workspaceId: true,
-        type: true,
-        entityId: true,
-        title: true,
-        message: true,
-        readAt: true,
-        createdAt: true,
-      },
+      select: notificationSelect,
     });
     return { message, notification };
   });
@@ -264,7 +259,9 @@ async function advanceRead(
     RETURNING "lastReadMessageId", "lastReadCreatedAt", "lastReadAt"
   `;
     const state = rows[0];
-    if (!state) return null;
+    if (!state) {
+      return null;
+    }
     const notifications = await tx.$queryRaw<{ id: string }[]>`
     UPDATE "Notification" n SET "readAt" = CURRENT_TIMESTAMP
     FROM "DirectMessage" m

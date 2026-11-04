@@ -7,7 +7,9 @@ import type { PublicUser } from './user.types.js';
 
 async function getCurrentUser(userId: string): Promise<PublicUser> {
   const user = await userRepository.findCurrentUser(userId);
-  if (!user) throw new AppError('User not found', 404, 'UserNotFound');
+  if (!user) {
+    throw new AppError('User not found', 404, 'UserNotFound');
+  }
   return user;
 }
 

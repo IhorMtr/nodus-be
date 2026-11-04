@@ -8,6 +8,7 @@ import {
 } from '../../src/queues/announcement.queue.js';
 import { closeRedis } from '../../src/redis/client.js';
 import { announcementWorker } from '../../src/workers/announcements.lifecycle.js';
+import { assertTestDatabase } from './helpers.js';
 
 // ==================== FIXTURES ====================
 
@@ -18,11 +19,7 @@ let workspaceId: string;
 // ==================== SETUP AND CLEANUP ====================
 
 beforeAll(async () => {
-  const databaseName = process.env.DATABASE_URL
-    ? (new URL(process.env.DATABASE_URL).pathname.slice(1).split('?')[0] ?? '')
-    : '';
-  if (!databaseName.endsWith('_test'))
-    throw new Error('Integration tests require a database ending in _test');
+  assertTestDatabase();
   await Promise.all([prisma.$connect(), announcementQueue.waitUntilReady()]);
   const user = await prisma.user.create({
     data: {
@@ -58,10 +55,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await announcementWorker.close();
-  if (workspaceId)
+  if (workspaceId) {
     await prisma.workspace.delete({ where: { id: workspaceId } });
-  if (userId) await prisma.user.delete({ where: { id: userId } });
-  if (memberId) await prisma.user.delete({ where: { id: memberId } });
+  }
+  if (userId) {
+    await prisma.user.delete({ where: { id: userId } });
+  }
+  if (memberId) {
+    await prisma.user.delete({ where: { id: memberId } });
+  }
   await announcementQueue.close();
   await closeRedis();
   await prisma.$disconnect();

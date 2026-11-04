@@ -1,6 +1,6 @@
-import type { Request, RequestHandler } from 'express';
+import type { RequestHandler } from 'express';
 import type { Query } from 'express-serve-static-core';
-import { AppError } from '../../shared/errors/app-error.js';
+import { authenticatedUserId } from '../../middleware/auth.middleware.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
 import { notificationService } from './notification.service.js';
@@ -10,14 +10,6 @@ import type {
   NotificationParams,
   PublicNotification,
 } from './notification.types.js';
-
-// ==================== AUTH CONTEXT ====================
-
-function userId(req: Request): string {
-  if (!req.auth)
-    throw new AppError('Access token is required', 401, 'Unauthorized');
-  return req.auth.userId;
-}
 
 // ==================== HANDLERS ====================
 
@@ -30,13 +22,20 @@ export const listNotifications: RequestHandler<
 > = async (req, res) => {
   res.json(
     successResponse(
-      await notificationService.list(userId(req), res.locals.validatedQuery)
+      await notificationService.list(
+        authenticatedUserId(req),
+        res.locals.validatedQuery
+      )
     )
   );
 };
 
 export const getUnreadCount: RequestHandler = async (req, res) => {
-  res.json(successResponse(await notificationService.unreadCount(userId(req))));
+  res.json(
+    successResponse(
+      await notificationService.unreadCount(authenticatedUserId(req))
+    )
+  );
 };
 
 export const markNotificationRead: RequestHandler<
@@ -45,11 +44,18 @@ export const markNotificationRead: RequestHandler<
 > = async (req, res) => {
   res.json(
     successResponse(
-      await notificationService.markRead(userId(req), req.params.notificationId)
+      await notificationService.markRead(
+        authenticatedUserId(req),
+        req.params.notificationId
+      )
     )
   );
 };
 
 export const markAllNotificationsRead: RequestHandler = async (req, res) => {
-  res.json(successResponse(await notificationService.markAllRead(userId(req))));
+  res.json(
+    successResponse(
+      await notificationService.markAllRead(authenticatedUserId(req))
+    )
+  );
 };

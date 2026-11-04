@@ -1,10 +1,8 @@
-import type { Request, RequestHandler } from 'express';
+import type { RequestHandler } from 'express';
 import type { ParamsDictionary } from 'express-serve-static-core';
-import { logger } from '../../config/logger.js';
-import { AppError } from '../../shared/errors/app-error.js';
+import { authenticatedUserId } from '../../middleware/auth.middleware.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
-import { socketPublisher } from '../../socket/socket.publisher.js';
 import { notificationBridge } from '../../socket/notification.bridge.js';
 import { workspaceMetricsService } from './workspace-metrics.service.js';
 import { workspaceService } from './workspace.service.js';
@@ -19,26 +17,13 @@ import type {
   WorkspaceParams,
 } from './workspace.types.js';
 
-// ==================== AUTH CONTEXT ====================
-
-function authenticatedUserId(req: Request): string {
-  if (!req.auth)
-    throw new AppError('Access token is required', 401, 'Unauthorized');
-  return req.auth.userId;
-}
-
 // ==================== REALTIME ====================
 
-async function revokeRealtimeAccess(
+function revokeRealtimeAccess(
   workspaceId: string,
   userIds: string[]
 ): Promise<void> {
-  try {
-    await socketPublisher.revokeWorkspaceAccess(workspaceId, userIds);
-  } catch (error) {
-    logger.error({ err: error, workspaceId }, 'Realtime revocation failed');
-  }
-  void notificationBridge.publishDirect({
+  return notificationBridge.broadcast({
     kind: 'workspace-revoked',
     workspaceId,
     userIds,
@@ -123,12 +108,18 @@ export const updateMemberRole: RequestHandler<
   ApiResponse<PublicWorkspaceMember>,
   UpdateMemberRoleInput
 > = async (req, res) => {
-  const member = await workspaceService.updateMemberRole(
+  const { member, notification } = await workspaceService.updateMemberRole(
     req.params.workspaceId,
     authenticatedUserId(req),
     req.params.userId,
     req.body
   );
+  if (notification) {
+    void notificationBridge.broadcast({
+      kind: 'notification-created',
+      notification,
+    });
+  }
   res.json(successResponse(member));
 };
 
@@ -136,11 +127,15 @@ export const removeMember: RequestHandler<
   WorkspaceMemberParams,
   ApiResponse<null>
 > = async (req, res) => {
-  await workspaceService.removeMember(
+  const notification = await workspaceService.removeMember(
     req.params.workspaceId,
     authenticatedUserId(req),
     req.params.userId
   );
+  void notificationBridge.broadcast({
+    kind: 'notification-created',
+    notification,
+  });
   await revokeRealtimeAccess(req.params.workspaceId, [req.params.userId]);
   res.json(successResponse(null));
 };

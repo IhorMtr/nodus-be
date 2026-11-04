@@ -19,7 +19,6 @@ export const prisma = new PrismaClient({
 
 // ==================== LOGGING ====================
 
-// Prisma error messages may include sensitive query arguments.
 prisma.$on('warn', event =>
   logger.warn({ target: event.target }, 'Prisma warning')
 );

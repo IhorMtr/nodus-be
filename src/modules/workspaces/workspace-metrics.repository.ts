@@ -40,8 +40,6 @@ async function countTotals(
 
 // ==================== ACTIVITY ====================
 
-// Distinct authors across three tables cannot be expressed with Prisma count, so one
-// raw query scans each source once and counts actions and current members together.
 async function countActivity(
   client: Prisma.TransactionClient,
   workspaceId: string,
@@ -76,13 +74,14 @@ async function countActivity(
       ON wm."workspaceId" = ${workspaceId}::uuid AND wm."userId" = a."userId"
   `;
   const row = rows[0];
-  if (!row) throw new Error('Activity aggregate returned no rows');
+  if (!row) {
+    throw new Error('Activity aggregate returned no rows');
+  }
   return row;
 }
 
 // ==================== PUBLIC API ====================
 
-// Repeatable read gives every count the same snapshot, so period counts never exceed totals.
 function collect<Period extends string>(
   workspaceId: string,
   periods: Readonly<Record<Period, Date>>

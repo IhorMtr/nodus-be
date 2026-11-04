@@ -1,8 +1,9 @@
 import { z } from 'zod';
+import { uuidSchema } from '../../shared/validation/schemas.js';
+import { workspaceParamsSchema } from '../workspaces/workspace.schema.js';
 
 // ==================== FIELD SCHEMAS ====================
 
-const uuid = z.uuid().transform(value => value.toLowerCase());
 const text = (max: number) => z.string().trim().min(1).max(max);
 const publishAt = z.iso
   .datetime({ offset: true })
@@ -27,8 +28,6 @@ export const updateAnnouncementSchema = z
 
 // ==================== PATH PARAMETERS ====================
 
-export const announcementWorkspaceParamsSchema = z.strictObject({
-  workspaceId: uuid,
+export const announcementParamsSchema = workspaceParamsSchema.extend({
+  announcementId: uuidSchema,
 });
-export const announcementParamsSchema =
-  announcementWorkspaceParamsSchema.extend({ announcementId: uuid });

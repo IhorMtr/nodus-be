@@ -1,15 +1,13 @@
-import type { Request, RequestHandler } from 'express';
-import { AppError } from '../../shared/errors/app-error.js';
+import type { RequestHandler } from 'express';
+import { authenticatedUserId } from '../../middleware/auth.middleware.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
-import { channelService } from './channel.service.js';
-import { channelReadStateService } from './channel-read-state.service.js';
 import { notificationBridge } from '../../socket/notification.bridge.js';
-import { socketPublisher } from '../../socket/socket.publisher.js';
-import { channelReadStateRepository } from './channel-read-state.repository.js';
+import type { WorkspaceParams } from '../workspaces/workspace.types.js';
+import { channelReadStateService } from './channel-read-state.service.js';
+import { channelService } from './channel.service.js';
 import type {
   ChannelParams,
-  ChannelWorkspaceParams,
   CreateChannelInput,
   MarkChannelReadInput,
   PublicChannel,
@@ -18,18 +16,10 @@ import type {
   UpdateChannelInput,
 } from './channel.types.js';
 
-// ==================== AUTH CONTEXT ====================
-
-function authenticatedUserId(req: Request): string {
-  if (!req.auth)
-    throw new AppError('Access token is required', 401, 'Unauthorized');
-  return req.auth.userId;
-}
-
 // ==================== CHANNEL LIFECYCLE ====================
 
 export const createChannel: RequestHandler<
-  ChannelWorkspaceParams,
+  WorkspaceParams,
   ApiResponse<PublicChannel>,
   CreateChannelInput
 > = async (req, res) => {
@@ -42,7 +32,7 @@ export const createChannel: RequestHandler<
 };
 
 export const listChannels: RequestHandler<
-  ChannelWorkspaceParams,
+  WorkspaceParams,
   ApiResponse<PublicChannelWithUnread[]>
 > = async (req, res) => {
   const channels = await channelService.listChannels(
@@ -97,36 +87,14 @@ export const markChannelRead: RequestHandler<
   ApiResponse<PublicChannelReadState>,
   MarkChannelReadInput
 > = async (req, res) => {
-  const state = await channelReadStateService.markRead(
+  const { state, receipt } = await channelReadStateService.markRead(
     req.params.workspaceId,
     authenticatedUserId(req),
     req.params.channelId,
     req.body.lastReadMessageId
   );
-  if (state.advanced) {
-    const reader = await channelReadStateRepository.reader(
-      authenticatedUserId(req)
-    );
-    if (reader) {
-      const payload = {
-        workspaceId: req.params.workspaceId,
-        channelId: req.params.channelId,
-        reader,
-        lastReadMessageId: state.state.lastReadMessageId,
-        lastReadCreatedAt: state.createdAt,
-      };
-      const recipientIds = await channelReadStateRepository.memberIds(
-        req.params.workspaceId
-      );
-      if (recipientIds.includes(authenticatedUserId(req))) {
-        socketPublisher.publishChannelRead(payload, recipientIds);
-        void notificationBridge.publishDirect({
-          kind: 'channel-read',
-          payload,
-          recipientIds,
-        });
-      }
-    }
+  if (receipt) {
+    void notificationBridge.broadcast({ kind: 'channel-read', ...receipt });
   }
-  res.json(successResponse(state.state));
+  res.json(successResponse(state));
 };

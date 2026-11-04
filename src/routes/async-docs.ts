@@ -2,8 +2,6 @@ import { Router } from 'express';
 
 // ==================== ASSETS ====================
 
-// Official AsyncAPI web component, pinned and loaded from jsDelivr so the backend needs no extra
-// npm dependencies. The script is protected with Subresource Integrity.
 const CDN_URL = 'https://cdn.jsdelivr.net';
 const WEB_COMPONENT_URL = `${CDN_URL}/npm/@asyncapi/web-component@3.1.8/lib/asyncapi-web-component.js`;
 const WEB_COMPONENT_INTEGRITY =
@@ -24,9 +22,6 @@ const page = `<!doctype html>
 </html>
 `;
 
-// Helmet's default policy only allows same-origin scripts. This page also needs the pinned CDN and
-// 'unsafe-eval': the AsyncAPI parser inside the web component compiles schemas with Ajv.
-// The page is mounted in development only.
 const contentSecurityPolicy = [
   "default-src 'self'",
   `script-src 'self' ${CDN_URL} 'unsafe-eval'`,

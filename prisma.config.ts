@@ -7,7 +7,6 @@ export default defineConfig({
     path: 'prisma/migrations',
   },
   datasource: {
-    // Generation works before .env exists; database commands still require a URL.
     url: process.env['DATABASE_URL'] ?? '',
   },
 });

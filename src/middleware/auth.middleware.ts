@@ -1,4 +1,4 @@
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
 import { verifyAccessToken } from '../modules/auth/auth.tokens.js';
 import type { AuthContext } from '../modules/auth/auth.types.js';
 import { AppError } from '../shared/errors/app-error.js';
@@ -31,3 +31,12 @@ export const authenticate: RequestHandler = (req, _res, next) => {
     next(error);
   }
 };
+
+// ==================== AUTH CONTEXT ====================
+
+export function authenticatedUserId(req: Request): string {
+  if (!req.auth) {
+    throw new AppError('Access token is required', 401, 'Unauthorized');
+  }
+  return req.auth.userId;
+}

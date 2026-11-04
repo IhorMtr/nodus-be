@@ -13,7 +13,6 @@ import type {
 // ==================== CONSTANTS ====================
 
 const PRODUCTION_HOST = 'nodus-be.onrender.com';
-// initializeSocket does not set a custom path, so Socket.IO uses its default.
 const SOCKET_IO_PATH = '/socket.io/';
 
 const USER_ROOM = userRoom('{userId}');
@@ -30,7 +29,6 @@ const EXAMPLE_IDS = {
 
 // ==================== HELPERS ====================
 
-// The helpers fail to compile when an event is documented in the wrong direction or does not exist.
 const received = <E extends keyof ClientToServerEvents>(event: E): E => event;
 const sent = <E extends keyof ServerToClientEvents>(event: E): E => event;
 
@@ -94,6 +92,8 @@ Room membership is not persistent. After a reconnect the client must emit \`chan
 ### Delivery semantics
 
 Socket.IO is an ephemeral notification channel, not a message queue. Events are not stored or replayed. Message creation events require a channel or conversation subscription; read events go to current members' private user rooms. No exactly-once guarantee is provided. PostgreSQL, read through the REST API, is the source of truth.
+
+The process that commits a change emits its event to its own sockets and forwards it through Redis pub/sub, so clients connected to any API process receive it. This covers message, direct message, read, notification and access revocation events, including notifications published by a standalone BullMQ worker. Presence uses its own Redis channel.
 
 Read receipts are computed from confirmed REST read-state updates. Room membership, an open conversation, and message delivery do not mark anything read. The read events go to all sockets of current members, including other devices. After reconnect, reload REST history for receipts and GET /notifications for unread state. For message:read, apply the reader to visible messages at or before (lastReadCreatedAt, lastReadMessageId), excluding the reader's own messages; deduplicate by reader id. notifications:read supplies the ids marked read and the current unread count.
 
@@ -160,7 +160,7 @@ Sent once the change is committed to PostgreSQL, in two cases:
 - a member was removed by \`DELETE /workspaces/{workspaceId}/members/{userId}\`: only the removed user receives it;
 - the workspace was deleted by \`DELETE /workspaces/{workspaceId}\`: every former member receives it, including the Owner who deleted it.
 
-The event is targeted through the user room \`${USER_ROOM}\` of each affected user, so every socket of that user receives it. Before it is sent, those sockets are removed from channel rooms \`${WORKSPACE_CHANNEL_ROOMS}\` and conversation rooms in that workspace, so they receive no further message events from it. Revocation is forwarded through the existing Redis pub/sub bridge to other API processes.
+The event is targeted through the user room \`${USER_ROOM}\` of each affected user, so every socket of that user receives it. Before it is sent, those sockets are removed from channel rooms \`${WORKSPACE_CHANNEL_ROOMS}\` and conversation rooms in that workspace, so they receive no further message events from it. Revocation reaches sockets on every API process through Redis pub/sub.
 
 The socket connection stays open. Rooms of other workspaces and the user's access to them are not affected. Clients should leave that workspace in the UI and refetch their navigation.
 `.trim();
@@ -461,7 +461,7 @@ export const asyncApiDocument = {
       title: 'Publish a notification',
       summary: 'Send notification:created to all sockets of the recipient.',
       description:
-        'Sent after the notification and its source action commit to PostgreSQL. The API process delivers notifications it creates directly; a standalone BullMQ worker, and direct messages sent through another API process, are forwarded through Redis pub/sub. Delivery is best effort; clients should fetch GET /notifications after reconnecting and deduplicate by id.',
+        'Sent after the notification and its source action commit to PostgreSQL, to every socket of the recipient on any API process. Notifications from a standalone BullMQ worker arrive through Redis pub/sub as well. Delivery is best effort; clients should fetch GET /notifications after reconnecting and deduplicate by id.',
       messages: [
         channelMessageRef('notificationCreated', 'NotificationCreated'),
       ],

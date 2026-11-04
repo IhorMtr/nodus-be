@@ -11,11 +11,11 @@ import {
   conversationRoomPrefix,
   userRoom,
 } from './socket.rooms.js';
-import type { SocketServer } from './socket.types.js';
 import type {
-  DirectReadPayload,
   ChannelReadPayload,
+  DirectReadPayload,
   NotificationsReadPayload,
+  SocketServer,
 } from './socket.types.js';
 
 // ==================== PUBLISHER ====================
@@ -29,13 +29,10 @@ class SocketPublisher {
     this.#socketServer = io;
   }
 
-  hasServer(): boolean {
-    return this.#socketServer !== undefined;
-  }
-
-  // Publishing happens after the database commit, so it must never fail the request.
   #publish(operation: string, send: (io: SocketServer) => void): void {
-    if (!this.#socketServer) return;
+    if (!this.#socketServer) {
+      return;
+    }
 
     try {
       send(this.#socketServer);
@@ -117,10 +114,12 @@ class SocketPublisher {
     );
   }
 
-  // ==================== NOTIFICATIONS ====================
+  // ==================== READ RECEIPTS ====================
 
   publishDirectRead(payload: DirectReadPayload, recipientIds: string[]): void {
-    if (!recipientIds.length) return;
+    if (recipientIds.length === 0) {
+      return;
+    }
     this.#publish('direct-message:read', io =>
       io
         .to(recipientIds.map(userRoom))
@@ -132,13 +131,17 @@ class SocketPublisher {
     payload: ChannelReadPayload,
     recipientIds: string[]
   ): void {
-    if (!recipientIds.length) return;
+    if (recipientIds.length === 0) {
+      return;
+    }
     this.#publish('message:read', io =>
       io
         .to(recipientIds.map(userRoom))
         .emit(SOCKET_EVENTS.MESSAGE_READ, payload)
     );
   }
+
+  // ==================== NOTIFICATIONS ====================
 
   publishNotificationsRead(payload: NotificationsReadPayload): void {
     this.#publish('notifications:read', io =>
@@ -160,7 +163,9 @@ class SocketPublisher {
   // ==================== PRESENCE ====================
 
   publishPresenceUpdated(update: PresenceUpdate, recipientIds: string[]): void {
-    if (recipientIds.length === 0) return;
+    if (recipientIds.length === 0) {
+      return;
+    }
     this.#publish('presence:updated', io => {
       io.to(recipientIds.map(userRoom)).emit(
         SOCKET_EVENTS.PRESENCE_UPDATED,
@@ -171,13 +176,13 @@ class SocketPublisher {
 
   // ==================== ACCESS REVOCATION ====================
 
-  // Drops every channel and conversation subscription of the users in the workspace
-  // across all their sockets, then tells those sockets that access was revoked.
   async revokeWorkspaceAccess(
     workspaceId: string,
     userIds: readonly string[]
   ): Promise<void> {
-    if (!this.#socketServer || userIds.length === 0) return;
+    if (!this.#socketServer || userIds.length === 0) {
+      return;
+    }
 
     try {
       const userSockets = this.#socketServer.in(userIds.map(userRoom));
@@ -189,11 +194,15 @@ class SocketPublisher {
 
       for (const socket of await userSockets.fetchSockets()) {
         for (const room of socket.rooms) {
-          if (prefixes.some(prefix => room.startsWith(prefix))) rooms.add(room);
+          if (prefixes.some(prefix => room.startsWith(prefix))) {
+            rooms.add(room);
+          }
         }
       }
 
-      if (rooms.size > 0) userSockets.socketsLeave([...rooms]);
+      if (rooms.size > 0) {
+        userSockets.socketsLeave([...rooms]);
+      }
       userSockets.emit(SOCKET_EVENTS.WORKSPACE_ACCESS_REVOKED, { workspaceId });
     } catch (error) {
       logger.error(

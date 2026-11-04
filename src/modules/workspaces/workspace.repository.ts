@@ -1,4 +1,5 @@
 import { prisma } from '../../database/client.js';
+import { isPrismaError } from '../../database/errors.js';
 import { Prisma, WorkspaceRole } from '../../generated/prisma/client.js';
 import { notificationRepository } from '../notifications/notification.repository.js';
 
@@ -67,7 +68,6 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
     });
   }
 
-  // Returns the former member ids so their live subscriptions can be revoked after commit.
   async function deleteWorkspace(workspaceId: string): Promise<string[]> {
     const members = await client.workspaceMember.findMany({
       where: { workspaceId },
@@ -152,10 +152,7 @@ function createWorkspaceRepository(client: Prisma.TransactionClient) {
 // ==================== TRANSACTIONS ====================
 
 export function isWorkspaceConflictError(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2034'
-  );
+  return isPrismaError(error, 'transactionConflict');
 }
 
 export async function withWorkspaceTransaction<T>(

@@ -1,7 +1,6 @@
 import type { z } from 'zod';
 import type {
   announcementParamsSchema,
-  announcementWorkspaceParamsSchema,
   createAnnouncementSchema,
   updateAnnouncementSchema,
 } from './announcement.schema.js';
@@ -10,9 +9,6 @@ import type {
 
 export type CreateAnnouncementInput = z.infer<typeof createAnnouncementSchema>;
 export type UpdateAnnouncementInput = z.infer<typeof updateAnnouncementSchema>;
-export type AnnouncementWorkspaceParams = z.infer<
-  typeof announcementWorkspaceParamsSchema
->;
 export type AnnouncementParams = z.infer<typeof announcementParamsSchema>;
 
 // ==================== RESPONSE TYPES ====================

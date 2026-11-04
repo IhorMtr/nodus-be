@@ -16,6 +16,18 @@ interface TokenResponse {
   data: { accessToken: string };
 }
 
+// ==================== SAFETY ====================
+
+export function assertTestDatabase(): void {
+  const url = process.env['DATABASE_URL'];
+  const databaseName = url
+    ? (new URL(url).pathname.slice(1).split('?')[0] ?? '')
+    : '';
+  if (!databaseName.endsWith('_test')) {
+    throw new Error('Integration tests require a database ending in _test');
+  }
+}
+
 // ==================== TEST DATA ====================
 
 export async function createUser(): Promise<TestUser> {
@@ -34,8 +46,9 @@ export async function createUser(): Promise<TestUser> {
       confirmPassword: user.password,
     });
 
-  if (response.status !== 201)
+  if (response.status !== 201) {
     throw new Error(`Test user registration failed: ${response.status}`);
+  }
   const body = response.body as TokenResponse;
   return {
     email: user.email,
@@ -51,8 +64,9 @@ export async function loginUser(
   const response = await request(app)
     .post('/auth/login')
     .send({ email, password });
-  if (response.status !== 200)
+  if (response.status !== 200) {
     throw new Error(`Test user login failed: ${response.status}`);
+  }
   const body = response.body as TokenResponse;
   return body.data.accessToken;
 }

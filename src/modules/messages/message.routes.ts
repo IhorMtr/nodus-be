@@ -5,6 +5,7 @@ import {
   validateParams,
   validateQuery,
 } from '../../middleware/validation.middleware.js';
+import { noStore } from '../../middleware/no-store.middleware.js';
 import {
   createMessage,
   deleteMessage,
@@ -12,9 +13,9 @@ import {
   listMessages,
   updateMessage,
 } from './message.controller.js';
+import { channelParamsSchema } from '../channels/channel.schema.js';
 import {
   createMessageSchema,
-  messageChannelParamsSchema,
   messageHistoryQuerySchema,
   messageParamsSchema,
   updateMessageSchema,
@@ -25,16 +26,13 @@ import {
 export const messageRouter = Router({ mergeParams: true });
 
 messageRouter.use(authenticate);
-messageRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+messageRouter.use(noStore);
 
 // ==================== ROUTES ====================
 
 messageRouter.post(
   '/',
-  validateParams(messageChannelParamsSchema),
+  validateParams(channelParamsSchema),
   validateBody(createMessageSchema),
   createMessage
 );
@@ -45,7 +43,7 @@ messageRouter.get(
 );
 messageRouter.get(
   '/',
-  validateParams(messageChannelParamsSchema),
+  validateParams(channelParamsSchema),
   validateQuery(messageHistoryQuerySchema),
   listMessages
 );

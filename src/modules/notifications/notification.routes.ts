@@ -4,6 +4,7 @@ import {
   validateParams,
   validateQuery,
 } from '../../middleware/validation.middleware.js';
+import { noStore } from '../../middleware/no-store.middleware.js';
 import {
   getUnreadCount,
   listNotifications,
@@ -19,10 +20,7 @@ import {
 
 export const notificationRouter = Router();
 notificationRouter.use(authenticate);
-notificationRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+notificationRouter.use(noStore);
 notificationRouter.get(
   '/',
   validateQuery(notificationListQuerySchema),

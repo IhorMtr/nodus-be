@@ -1,68 +1,66 @@
-import type { Request, RequestHandler } from 'express';
-import { AppError } from '../../shared/errors/app-error.js';
+import type { RequestHandler } from 'express';
+import { authenticatedUserId } from '../../middleware/auth.middleware.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
+import { notificationBridge } from '../../socket/notification.bridge.js';
+import type { PublicNotification } from '../notifications/notification.types.js';
+import type { WorkspaceParams } from '../workspaces/workspace.types.js';
 import { announcementService } from './announcement.service.js';
 import type {
   AnnouncementParams,
-  AnnouncementWorkspaceParams,
   CreateAnnouncementInput,
   PublicAnnouncement,
   UpdateAnnouncementInput,
 } from './announcement.types.js';
 
-// ==================== AUTHENTICATION ====================
+// ==================== REALTIME ====================
 
-function userId(req: Request) {
-  if (!req.auth)
-    throw new AppError('Access token is required', 401, 'Unauthorized');
-  return req.auth.userId;
+function broadcastNotifications(notifications: PublicNotification[]): void {
+  for (const notification of notifications) {
+    void notificationBridge.broadcast({
+      kind: 'notification-created',
+      notification,
+    });
+  }
 }
 
 // ==================== HANDLERS ====================
 
 export const createAnnouncement: RequestHandler<
-  AnnouncementWorkspaceParams,
+  WorkspaceParams,
   ApiResponse<PublicAnnouncement>,
   CreateAnnouncementInput
 > = async (req, res) => {
-  res
-    .status(201)
-    .json(
-      successResponse(
-        await announcementService.create(
-          req.params.workspaceId,
-          userId(req),
-          req.body
-        )
-      )
-    );
+  const { announcement, notifications } = await announcementService.create(
+    req.params.workspaceId,
+    authenticatedUserId(req),
+    req.body
+  );
+  broadcastNotifications(notifications);
+  res.status(201).json(successResponse(announcement));
 };
 
 export const listAnnouncements: RequestHandler<
-  AnnouncementWorkspaceParams,
+  WorkspaceParams,
   ApiResponse<PublicAnnouncement[]>
 > = async (req, res) => {
-  res.json(
-    successResponse(
-      await announcementService.list(req.params.workspaceId, userId(req))
-    )
+  const announcements = await announcementService.list(
+    req.params.workspaceId,
+    authenticatedUserId(req)
   );
+  res.json(successResponse(announcements));
 };
 
 export const getAnnouncement: RequestHandler<
   AnnouncementParams,
   ApiResponse<PublicAnnouncement>
 > = async (req, res) => {
-  res.json(
-    successResponse(
-      await announcementService.get(
-        req.params.workspaceId,
-        userId(req),
-        req.params.announcementId
-      )
-    )
+  const announcement = await announcementService.get(
+    req.params.workspaceId,
+    authenticatedUserId(req),
+    req.params.announcementId
   );
+  res.json(successResponse(announcement));
 };
 
 export const updateAnnouncement: RequestHandler<
@@ -70,16 +68,14 @@ export const updateAnnouncement: RequestHandler<
   ApiResponse<PublicAnnouncement>,
   UpdateAnnouncementInput
 > = async (req, res) => {
-  res.json(
-    successResponse(
-      await announcementService.update(
-        req.params.workspaceId,
-        userId(req),
-        req.params.announcementId,
-        req.body
-      )
-    )
+  const { announcement, notifications } = await announcementService.update(
+    req.params.workspaceId,
+    authenticatedUserId(req),
+    req.params.announcementId,
+    req.body
   );
+  broadcastNotifications(notifications);
+  res.json(successResponse(announcement));
 };
 
 export const deleteAnnouncement: RequestHandler<
@@ -88,7 +84,7 @@ export const deleteAnnouncement: RequestHandler<
 > = async (req, res) => {
   await announcementService.remove(
     req.params.workspaceId,
-    userId(req),
+    authenticatedUserId(req),
     req.params.announcementId
   );
   res.json(successResponse(null));

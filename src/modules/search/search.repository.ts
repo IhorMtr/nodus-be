@@ -1,4 +1,5 @@
 import { prisma } from '../../database/client.js';
+import { olderThan } from '../../shared/pagination/cursor.js';
 import type { SearchQuery } from './search.types.js';
 
 // ==================== SEARCH ====================
@@ -13,18 +14,7 @@ function searchMessages(workspaceId: string, query: SearchQuery) {
       channel: { workspaceId },
       ...(query.channelId ? { channelId: query.channelId } : {}),
       content: { contains: escapeLikePattern(query.q), mode: 'insensitive' },
-      ...(query.cursor
-        ? {
-            createdAt: { lte: query.cursor.createdAt },
-            OR: [
-              { createdAt: { lt: query.cursor.createdAt } },
-              {
-                createdAt: query.cursor.createdAt,
-                id: { lt: query.cursor.id },
-              },
-            ],
-          }
-        : {}),
+      ...(query.cursor ? olderThan(query.cursor) : {}),
     },
     select: {
       id: true,

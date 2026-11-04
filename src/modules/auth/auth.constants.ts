@@ -1,7 +1,11 @@
 import { argon2id } from 'argon2';
 
+// ==================== TOKENS ====================
+
 export const ACCESS_TOKEN_TTL_SECONDS = 15 * 60;
 export const REFRESH_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+// ==================== PASSWORD HASHING ====================
 
 export const ARGON2_OPTIONS = {
   type: argon2id,
@@ -9,6 +13,8 @@ export const ARGON2_OPTIONS = {
   timeCost: 2,
   parallelism: 1,
 } as const;
+
+// ==================== RATE LIMITS ====================
 
 export const LOGIN_LIMIT = 30;
 export const LOGIN_WINDOW_MS = 15 * 60 * 1_000;

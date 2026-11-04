@@ -1,5 +1,11 @@
 import { prisma } from '../../database/client.js';
-import { Prisma } from '../../generated/prisma/client.js';
+import { isPrismaError } from '../../database/errors.js';
+import type { Prisma } from '../../generated/prisma/client.js';
+import {
+  newerThan,
+  olderThan,
+  type Cursor,
+} from '../../shared/pagination/cursor.js';
 import type { MessageHistoryQuery } from './message.types.js';
 
 // ==================== SELECTS ====================
@@ -27,63 +33,34 @@ function listChannelMessages(
   channelId: string,
   { limit, before, after }: MessageHistoryQuery
 ) {
+  const order = after ? 'asc' : 'desc';
   return prisma.message.findMany({
     where: {
       channelId,
-      ...(before
-        ? {
-            // Bound the index scan before applying the UUID tie-breaker.
-            createdAt: { lte: before.createdAt },
-            OR: [
-              { createdAt: { lt: before.createdAt } },
-              { createdAt: before.createdAt, id: { lt: before.id } },
-            ],
-          }
-        : {}),
-      ...(after
-        ? {
-            createdAt: { gte: after.createdAt },
-            OR: [
-              { createdAt: { gt: after.createdAt } },
-              { createdAt: after.createdAt, id: { gt: after.id } },
-            ],
-          }
-        : {}),
+      ...(before ? olderThan(before) : {}),
+      ...(after ? newerThan(after) : {}),
     },
     select: messageSelect,
-    orderBy: after
-      ? [{ createdAt: 'asc' }, { id: 'asc' }]
-      : [{ createdAt: 'desc' }, { id: 'desc' }],
+    orderBy: [{ createdAt: order }, { id: order }],
     take: limit + 1,
   });
 }
 
 function listContextSide(
   channelId: string,
-  target: { createdAt: Date; id: string },
+  target: Cursor,
   direction: 'older' | 'newer',
   limit: number
 ) {
   const older = direction === 'older';
+  const order = older ? 'desc' : 'asc';
   return prisma.message.findMany({
     where: {
       channelId,
-      createdAt: older ? { lte: target.createdAt } : { gte: target.createdAt },
-      OR: older
-        ? [
-            { createdAt: { lt: target.createdAt } },
-            { createdAt: target.createdAt, id: { lt: target.id } },
-          ]
-        : [
-            { createdAt: { gt: target.createdAt } },
-            { createdAt: target.createdAt, id: { gt: target.id } },
-          ],
+      ...(older ? olderThan(target) : newerThan(target)),
     },
     select: messageSelect,
-    orderBy: [
-      { createdAt: older ? 'desc' : 'asc' },
-      { id: older ? 'desc' : 'asc' },
-    ],
+    orderBy: [{ createdAt: order }, { id: order }],
     take: limit + 1,
   });
 }
@@ -116,17 +93,11 @@ async function deleteMessage(
 // ==================== DATABASE ERRORS ====================
 
 export function isMessageNotFoundError(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2025'
-  );
+  return isPrismaError(error, 'recordNotFound');
 }
 
 export function isMessageRelationMissingError(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2003'
-  );
+  return isPrismaError(error, 'foreignKeyViolation');
 }
 
 // ==================== PUBLIC API ====================

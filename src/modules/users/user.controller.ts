@@ -1,12 +1,11 @@
 import type { RequestHandler } from 'express';
 import type { ParamsDictionary } from 'express-serve-static-core';
-import { AppError } from '../../shared/errors/app-error.js';
+import { authenticatedUserId } from '../../middleware/auth.middleware.js';
 import type { ApiResponse } from '../../shared/types/api-response.js';
 import { successResponse } from '../../shared/utils/api-response.js';
-import { userService } from './user.service.js';
-import type { PublicUser } from './user.types.js';
-import type { UpdateStatusInput } from './user.types.js';
 import type { PresenceUpdate } from '../presence/presence.service.js';
+import { userService } from './user.service.js';
+import type { PublicUser, UpdateStatusInput } from './user.types.js';
 
 // ==================== CURRENT USER ====================
 
@@ -14,9 +13,7 @@ export const getCurrentUser: RequestHandler<
   ParamsDictionary,
   ApiResponse<PublicUser>
 > = async (req, res) => {
-  if (!req.auth)
-    throw new AppError('Access token is required', 401, 'Unauthorized');
-  const user = await userService.getCurrentUser(req.auth.userId);
+  const user = await userService.getCurrentUser(authenticatedUserId(req));
   res.json(successResponse(user));
 };
 
@@ -27,8 +24,9 @@ export const updateStatus: RequestHandler<
   ApiResponse<PresenceUpdate>,
   UpdateStatusInput
 > = async (req, res) => {
-  if (!req.auth)
-    throw new AppError('Access token is required', 401, 'Unauthorized');
-  const status = await userService.setStatus(req.auth.userId, req.body.status);
+  const status = await userService.setStatus(
+    authenticatedUserId(req),
+    req.body.status
+  );
   res.json(successResponse(status));
 };

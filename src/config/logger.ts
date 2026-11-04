@@ -18,21 +18,24 @@ const sensitiveFields = [
   'authorization',
 ];
 
+function errorCode(error: Error): string | undefined {
+  if (!('code' in error) || typeof error.code !== 'string') {
+    return undefined;
+  }
+  return /^[A-Z0-9_]+$/.test(error.code) ? error.code : undefined;
+}
+
 function serializeError(error: unknown) {
-  if (!(error instanceof Error)) return { type: 'UnknownError' };
-  // Database errors can embed query arguments in their messages and causes.
+  if (!(error instanceof Error)) {
+    return { type: 'UnknownError' };
+  }
   const header = `${error.name}: ${error.message}`;
   const frames = error.stack?.startsWith(header)
     ? error.stack.slice(header.length)
     : undefined;
   return {
     type: error.name,
-    code:
-      'code' in error &&
-      typeof error.code === 'string' &&
-      /^[A-Z0-9_]+$/.test(error.code)
-        ? error.code
-        : undefined,
+    code: errorCode(error),
     stack: frames
       ?.split('\n')
       .filter(line => /^\s+at /.test(line))

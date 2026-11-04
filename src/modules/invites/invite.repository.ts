@@ -1,5 +1,6 @@
 import { prisma } from '../../database/client.js';
-import { Prisma } from '../../generated/prisma/client.js';
+import { isPrismaError } from '../../database/errors.js';
+import type { Prisma } from '../../generated/prisma/client.js';
 
 // ==================== SELECTS ====================
 
@@ -107,8 +108,5 @@ export function withInviteTransaction<T>(
 }
 
 export function isUniqueMembershipError(error: unknown): boolean {
-  return (
-    error instanceof Prisma.PrismaClientKnownRequestError &&
-    error.code === 'P2002'
-  );
+  return isPrismaError(error, 'uniqueViolation');
 }

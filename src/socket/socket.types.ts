@@ -64,7 +64,6 @@ export type WorkspaceAccessRevokedPayload = {
   workspaceId: string;
 };
 
-// Acknowledgements reuse the REST envelope so clients handle one response shape.
 export type SocketAck<T> = ApiResponse<T>;
 
 // ==================== EVENT MAPS ====================

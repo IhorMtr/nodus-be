@@ -4,6 +4,7 @@ import {
   validateBody,
   validateParams,
 } from '../../middleware/validation.middleware.js';
+import { noStore } from '../../middleware/no-store.middleware.js';
 import {
   createChannel,
   deleteChannel,
@@ -12,9 +13,9 @@ import {
   markChannelRead,
   updateChannel,
 } from './channel.controller.js';
+import { workspaceParamsSchema } from '../workspaces/workspace.schema.js';
 import {
   channelParamsSchema,
-  channelWorkspaceParamsSchema,
   createChannelSchema,
   markChannelReadSchema,
   updateChannelSchema,
@@ -25,24 +26,17 @@ import {
 export const channelRouter = Router({ mergeParams: true });
 
 channelRouter.use(authenticate);
-channelRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+channelRouter.use(noStore);
 
 // ==================== ROUTES ====================
 
 channelRouter.post(
   '/',
-  validateParams(channelWorkspaceParamsSchema),
+  validateParams(workspaceParamsSchema),
   validateBody(createChannelSchema),
   createChannel
 );
-channelRouter.get(
-  '/',
-  validateParams(channelWorkspaceParamsSchema),
-  listChannels
-);
+channelRouter.get('/', validateParams(workspaceParamsSchema), listChannels);
 channelRouter.put(
   '/:channelId/read-state',
   validateParams(channelParamsSchema),

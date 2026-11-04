@@ -5,6 +5,7 @@ import {
   validateParams,
   validateQuery,
 } from '../../middleware/validation.middleware.js';
+import { noStore } from '../../middleware/no-store.middleware.js';
 import {
   createConversation,
   deleteDirectMessage,
@@ -21,17 +22,14 @@ import {
   directMessageParamsSchema,
   directMessageSchema,
   markConversationReadSchema,
-  workspaceParamsSchema,
 } from './conversation.schema.js';
+import { workspaceParamsSchema } from '../workspaces/workspace.schema.js';
 
 // ==================== ROUTER ====================
 
 export const conversationRouter = Router({ mergeParams: true });
 conversationRouter.use(authenticate);
-conversationRouter.use((_req, res, next) => {
-  res.setHeader('Cache-Control', 'no-store');
-  next();
-});
+conversationRouter.use(noStore);
 
 // ==================== ROUTES ====================
 
